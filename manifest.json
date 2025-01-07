@@ -1,0 +1,13 @@
+{
+  "name": "Custom Cursor",
+  "version": "0.0.1",
+  "description": "A custom cursor extension that replaces your browser's default cursor with a large circular one.",
+  "manifest_version": 3,
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ]
+}
