@@ -1,13 +1,30 @@
 {
-  "name": "Custom Cursor",
-  "version": "0.0.1",
-  "description": "A custom cursor extension that replaces your browser's default cursor with a large circular one.",
   "manifest_version": 3,
+  "name": "Custom Cursor for Screen Share",
+  "version": "1.0",
+  "description": "A Chrome extension that enhances cursor visibility during screen sharing",
+  "permissions": [
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["styles.css"]
+      "css": ["styles.css"],
+      "js": [
+        "html2canvas.js",
+        "gaze-tracker.js",
+        "content.js"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["gaze-tracker.js", "html2canvas.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
