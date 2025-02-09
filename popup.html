@@ -29,8 +29,9 @@
 <body>
     <div id="debug-info"></div>
     <script src="face-api.min.js"></script>
+    <script src="webgazer.js"></script>
     <script>
-        // Initialize face-api.js before webgazer
+        // Initialize face-api.js and models
         async function initializeFaceAPI() {
             const statusDiv = document.createElement('div');
             statusDiv.id = 'loading-status';
@@ -46,6 +47,7 @@
                 statusDiv.textContent = '顔認識モデルを読み込んでいます...';
                 console.log('顔認識モデルを読み込んでいます...');
                 
+                // Load models using chrome.runtime.getURL
                 const modelPath = chrome.runtime.getURL('models');
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
@@ -79,29 +81,21 @@
                     throw new Error('顔認識モデルの読み込みに失敗しました');
                 }
                 
-                // Load and initialize webgazer
-                statusDiv.textContent = '視線追跡システムを読み込み中...';
-                const webgazerScript = document.createElement('script');
-                webgazerScript.src = chrome.runtime.getURL('webgazer.js');
-                
-                await new Promise((resolve, reject) => {
-                    webgazerScript.onload = async () => {
-                        try {
-                            if (typeof window.initWebGazer !== 'function') {
-                                throw new Error('WebGazerが正しく読み込まれていません');
-                            }
-                            statusDiv.textContent = '視線追跡システムを初期化中...';
-                            const webgazer = await window.initWebGazer();
-                            statusDiv.textContent = '視線追跡の初期化が完了しました';
-                            console.log('視線追跡の初期化が完了しました');
-                            resolve();
-                        } catch (err) {
-                            reject(new Error('視線追跡の初期化に失敗しました: ' + err.message));
-                        }
-                    };
-                    webgazerScript.onerror = () => reject(new Error('webgazer.jsの読み込みに失敗しました'));
-                    document.body.appendChild(webgazerScript);
-                });
+                // Initialize WebGazer
+                statusDiv.textContent = '視線追跡システムを初期化中...';
+                try {
+                    if (typeof window.initWebGazer !== 'function') {
+                        throw new Error('WebGazerが正しく読み込まれていません');
+                    }
+                    const webgazer = await window.initWebGazer();
+                    if (!webgazer) {
+                        throw new Error('WebGazerの初期化に失敗しました');
+                    }
+                    statusDiv.textContent = '視線追跡の初期化が完了しました';
+                    console.log('視線追跡の初期化が完了しました');
+                } catch (err) {
+                    throw new Error('視線追跡の初期化に失敗しました: ' + err.message);
+                }
             } catch (err) {
                 console.error(err.message);
                 statusDiv.style.color = 'red';
