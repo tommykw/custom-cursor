@@ -16,6 +16,7 @@
       "css": ["styles.css"],
       "js": [
         "html2canvas.js",
+        "face-api.min.js",
         "webgazer.js",
         "gaze-tracker.js",
         "content.js"
