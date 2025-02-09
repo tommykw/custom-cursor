@@ -32,7 +32,7 @@ class WebGazer {
     return display;
   }
 
-  async begin() {
+  async initialize() {
     try {
       console.log('視線追跡の初期化を開始します...');
       
@@ -41,32 +41,25 @@ class WebGazer {
         throw new Error('face-api.jsが読み込まれていません');
       }
       
-      // Request camera access through background service worker
-      const response = await chrome.runtime.sendMessage({ type: 'requestCamera' });
-      if (!response || !response.granted) {
-        throw new Error('カメラの使用が許可されませんでした: ' + (response?.error || '不明なエラー'));
-      }
+      // Initialize display
+      this.initializeDisplay();
       
       // Initialize video stream
       try {
         this.stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: "user"
-          },
+          video: { width: 640, height: 480, facingMode: 'user' },
           audio: false
         });
         console.log('カメラストリームの初期化が完了しました');
-      } catch (cameraError) {
-        if (cameraError.name === 'NotAllowedError') {
-          throw new Error('カメラの使用が許可されませんでした。視線追跡には必要です。');
-        } else if (cameraError.name === 'NotFoundError') {
-          throw new Error('カメラが見つかりませんでした。カメラが接続されているか確認してください。');
-        } else if (cameraError.name === 'NotReadableError') {
-          throw new Error('カメラにアクセスできません。他のアプリケーションがカメラを使用している可能性があります。');
+      } catch (error) {
+        if (error.name === 'NotAllowedError') {
+          throw new Error('カメラの使用が許可されませんでした');
+        } else if (error.name === 'NotFoundError') {
+          throw new Error('カメラが見つかりませんでした');
+        } else if (error.name === 'NotReadableError') {
+          throw new Error('カメラにアクセスできません');
         }
-        throw new Error('カメラの初期化に失敗しました: ' + cameraError.message);
+        throw error;
       }
 
       // ビデオ要素の初期化と設定
@@ -483,7 +476,7 @@ window.initWebGazer = async function() {
     
     try {
       // Initialize WebGazer
-      await webgazer.begin();
+      await webgazer.initialize();
       console.log('WebGazerの初期化が完了しました');
       return webgazer;
     } catch (initError) {
@@ -496,4 +489,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready');                          
+console.log('webgazer.js loaded and ready');                              

@@ -6,125 +6,79 @@
         body {
             width: 800px;
             height: 600px;
+            margin: 0;
+            padding: 20px;
+            font-family: sans-serif;
         }
-        .test-target {
+        #loading-status {
             position: fixed;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: red;
+            top: 50%;
+            left: 50%;
             transform: translate(-50%, -50%);
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 14px;
+            z-index: 2147483647;
         }
         #debug-info {
             position: fixed;
             top: 10px;
             right: 10px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 10px;
+            border-radius: 5px;
             font-family: monospace;
+            font-size: 12px;
+            z-index: 2147483646;
         }
     </style>
 </head>
 <body>
+    <div id="loading-status">初期化中...</div>
     <div id="debug-info"></div>
+
     <script src="face-api.min.js"></script>
     <script src="webgazer.js"></script>
     <script>
-        // Initialize face-api.js and models
-        async function initializeFaceAPI() {
-            const statusDiv = document.createElement('div');
-            statusDiv.id = 'loading-status';
-            statusDiv.style.padding = '20px';
-            document.body.appendChild(statusDiv);
+        async function initializeTracking() {
+            const statusDiv = document.getElementById('loading-status');
 
             try {
-                // Check if face-api.js is loaded
-                if (typeof faceapi === 'undefined') {
-                    throw new Error('face-api.jsが読み込まれていません');
-                }
-
+                // Initialize face-api.js first
                 statusDiv.textContent = '顔認識モデルを読み込んでいます...';
-                console.log('顔認識モデルを読み込んでいます...');
                 
-                // Load models using chrome.runtime.getURL
+                // Load face-api.js models
                 const modelPath = chrome.runtime.getURL('models');
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
                     faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
                 ]);
-
                 console.log('顔認識モデルの読み込みが完了しました');
-                statusDiv.textContent = '顔認識モデルの読み込みが完了しました';
-                return true;
-            } catch (error) {
-                console.error('顔認識モデルの読み込みに失敗しました:', error);
-                statusDiv.style.color = 'red';
-                statusDiv.textContent = error.message;
-                return false;
-            }
-        }
 
-        // Initialize tracking with proper error handling
-        async function initializeTracking() {
-            const statusDiv = document.getElementById('loading-status') || document.createElement('div');
-            statusDiv.id = 'loading-status';
-            statusDiv.style.padding = '20px';
-            if (!statusDiv.parentNode) {
-                document.body.appendChild(statusDiv);
-            }
-
-            try {
-                // Initialize face-api.js first
-                statusDiv.textContent = '顔認識システムを初期化中...';
-                if (!await initializeFaceAPI()) {
-                    throw new Error('顔認識モデルの読み込みに失敗しました');
-                }
-                
                 // Initialize WebGazer
                 statusDiv.textContent = '視線追跡システムを初期化中...';
-                try {
-                    if (typeof window.initWebGazer !== 'function') {
-                        throw new Error('WebGazerが正しく読み込まれていません');
-                    }
-                    const webgazer = await window.initWebGazer();
-                    if (!webgazer) {
-                        throw new Error('WebGazerの初期化に失敗しました');
-                    }
-                    statusDiv.textContent = '視線追跡の初期化が完了しました';
-                    console.log('視線追跡の初期化が完了しました');
-                } catch (err) {
-                    throw new Error('視線追跡の初期化に失敗しました: ' + err.message);
-                }
-            } catch (err) {
-                console.error(err.message);
+                const webgazer = await window.initWebGazer();
+                
+                // Update status
+                statusDiv.textContent = '視線追跡の初期化が完了しました';
+                setTimeout(() => {
+                    statusDiv.style.opacity = '0';
+                    statusDiv.style.transition = 'opacity 0.5s ease';
+                }, 1500);
+
+            } catch (error) {
+                console.error('初期化エラー:', error);
                 statusDiv.style.color = 'red';
-                statusDiv.textContent = err.message;
+                statusDiv.textContent = error.message;
             }
         }
 
-        // Wait for face-api.js to load before initializing
-        window.addEventListener('load', async () => {
-            try {
-                // Check if face-api.js is loaded
-                if (typeof faceapi === 'undefined') {
-                    throw new Error('face-api.jsが読み込まれていません');
-                }
-
-                // Initialize tracking
-                await initializeTracking();
-            } catch (error) {
-                console.error('初期化エラー:', error);
-                const statusDiv = document.getElementById('loading-status') || document.createElement('div');
-                statusDiv.id = 'loading-status';
-                statusDiv.style.color = 'red';
-                statusDiv.style.padding = '20px';
-                statusDiv.textContent = error.message;
-                if (!statusDiv.parentNode) {
-                    document.body.appendChild(statusDiv);
-                }
-            }
-        });
+        // Wait for page load before initializing
+        window.addEventListener('load', initializeTracking);
     </script>
 </body>
 </html>
