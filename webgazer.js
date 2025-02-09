@@ -36,15 +36,15 @@ class WebGazer {
     try {
       console.log('視線追跡の初期化を開始します...');
       
-      // face-api.jsのモデルを読み込む
-      try {
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-          faceapi.nets.faceLandmark68Net.loadFromUri('/models')
-        ]);
-        console.log('顔認識モデルの読み込みが完了しました');
-      } catch (modelError) {
-        throw new Error('顔認識モデルの読み込みに失敗しました: ' + modelError.message);
+      // Request camera permission through background service worker
+      const response = await chrome.runtime.sendMessage({ type: 'requestCamera' });
+      if (!response.granted) {
+        throw new Error('カメラの使用が許可されませんでした。視線追跡には必要です。');
+      }
+      
+      // Initialize face-api.js
+      if (!await window.initializeFaceAPI()) {
+        throw new Error('顔認識モデルの読み込みに失敗しました。');
       }
       
       // カメラアクセスの前にユーザーに説明
@@ -484,4 +484,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready');                
+console.log('webgazer.js loaded and ready');                  
