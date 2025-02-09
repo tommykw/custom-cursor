@@ -182,6 +182,33 @@ class WebGazer {
     );
   }
 
+  calculatePupilCenter(eyePoints) {
+    // 目の領域の中心を計算
+    const centerX = eyePoints.reduce((sum, p) => sum + p.x, 0) / eyePoints.length;
+    const centerY = eyePoints.reduce((sum, p) => sum + p.y, 0) / eyePoints.length;
+    
+    return { x: centerX, y: centerY };
+  }
+
+  estimateGazePoint(leftPupil, rightPupil) {
+    // 両目の中心点を計算
+    const centerX = (leftPupil.x + rightPupil.x) / 2;
+    const centerY = (leftPupil.y + rightPupil.y) / 2;
+    
+    // 画面上の座標に変換
+    // ビデオ座標から画面座標への変換
+    const videoRect = this.videoElement.getBoundingClientRect();
+    const scaleX = window.innerWidth / videoRect.width;
+    const scaleY = window.innerHeight / videoRect.height;
+    
+    return {
+      x: centerX * scaleX,
+      y: centerY * scaleY,
+      leftEye: leftPupil,
+      rightEye: rightPupil
+    };
+  }
+
   async track() {
     if (!this.isTracking) return;
 
@@ -241,4 +268,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready');    
+console.log('webgazer.js loaded and ready');      
