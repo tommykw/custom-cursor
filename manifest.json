@@ -6,7 +6,7 @@
   "permissions": [
     "activeTab",
     "tabs",
-    "camera"
+    "videoCapture"
   ],
   "host_permissions": [
     "<all_urls>"
