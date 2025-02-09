@@ -28,15 +28,14 @@
       ]
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "gaze-tracker.js",
-        "html2canvas.js",
-        "face-api.min.js",
-        "models/*"
-      ],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "web_accessible_resources": [{
+    "resources": [
+      "face-api.min.js",
+      "models/*",
+      "webgazer.js",
+      "gaze-tracker.js",
+      "html2canvas.js"
+    ],
+    "matches": ["<all_urls>"]
+  }]
 }
