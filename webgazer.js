@@ -36,15 +36,20 @@ class WebGazer {
     try {
       console.log('視線追跡の初期化を開始します...');
       
-      // Request camera permission through background service worker
-      const response = await chrome.runtime.sendMessage({ type: 'requestCamera' });
-      if (!response.granted) {
-        throw new Error('カメラの使用が許可されませんでした。視線追跡には必要です。');
+      // Check if face-api.js initialization function exists
+      if (typeof window.initializeFaceAPI !== 'function') {
+        throw new Error('WebGazerが正しく読み込まれていません');
       }
       
       // Initialize face-api.js
       if (!await window.initializeFaceAPI()) {
         throw new Error('顔認識モデルの読み込みに失敗しました。');
+      }
+      
+      // Request camera permission through background service worker
+      const response = await chrome.runtime.sendMessage({ type: 'requestCamera' });
+      if (!response || !response.granted) {
+        throw new Error('カメラの使用が許可されませんでした。視線追跡には必要です。');
       }
       
       // カメラアクセスの前にユーザーに説明
@@ -484,4 +489,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready');                  
+console.log('webgazer.js loaded and ready');                    
