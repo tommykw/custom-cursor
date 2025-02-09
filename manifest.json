@@ -6,19 +6,20 @@
   "permissions": [
     "activeTab",
     "tabs",
-    "camera"
+    "videoCapture"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
+  "action": {
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "css": ["styles.css"],
       "js": [
         "html2canvas.js",
-        "face-api.min.js",
-        "webgazer.js",
         "gaze-tracker.js",
         "content.js"
       ]
@@ -26,7 +27,12 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["gaze-tracker.js", "html2canvas.js"],
+      "resources": [
+        "gaze-tracker.js",
+        "html2canvas.js",
+        "face-api.min.js",
+        "models/*"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

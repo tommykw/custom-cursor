@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eye Tracking Test</title>
+    <style>
+        body {
+            width: 800px;
+            height: 600px;
+        }
+        .test-target {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: red;
+            transform: translate(-50%, -50%);
+        }
+        #debug-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="debug-info"></div>
+    <script src="face-api.min.js"></script>
+    <script>
+        // Initialize face-api.js and webgazer
+        async function initializeTracking() {
+            try {
+                // Get extension URLs for models
+                const modelPath = chrome.runtime.getURL('models');
+                console.log('Loading models from:', modelPath);
+                
+                // Load face-api.js models
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
+                ]);
+                console.log('Face-api models loaded successfully');
+                
+                // Load webgazer.js
+                const webgazerScript = document.createElement('script');
+                webgazerScript.src = chrome.runtime.getURL('webgazer.js');
+                webgazerScript.onload = async () => {
+                    try {
+                        const webgazer = await window.initWebGazer();
+                        console.log('WebGazer initialized successfully');
+                    } catch (err) {
+                        console.error('WebGazer initialization error:', err);
+                    }
+                };
+                document.body.appendChild(webgazerScript);
+            } catch (err) {
+                console.error('Error loading face-api models:', err);
+            }
+        }
+
+        // Start initialization when the page loads
+        document.addEventListener('DOMContentLoaded', initializeTracking);
+    </script>
+</body>
+</html>
