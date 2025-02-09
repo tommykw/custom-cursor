@@ -30,34 +30,57 @@
     <div id="debug-info"></div>
     <script src="face-api.min.js"></script>
     <script>
-        // Initialize face-api.js and webgazer
-        async function initializeTracking() {
+        // Initialize face-api.js before webgazer
+        async function initializeFaceAPI() {
             try {
-                // Get extension URLs for models
                 const modelPath = chrome.runtime.getURL('models');
-                console.log('Loading models from:', modelPath);
+                console.log('顔認識モデルを読み込んでいます...');
                 
-                // Load face-api.js models
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
                     faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
                 ]);
-                console.log('Face-api models loaded successfully');
+                console.log('顔認識モデルの読み込みが完了しました');
+                return true;
+            } catch (error) {
+                console.error('顔認識モデルの読み込みに失敗しました:', error);
+                return false;
+            }
+        }
+
+        // Initialize tracking with proper error handling
+        async function initializeTracking() {
+            try {
+                // Initialize face-api.js first
+                if (!await initializeFaceAPI()) {
+                    throw new Error('顔認識モデルの読み込みに失敗しました');
+                }
                 
-                // Load webgazer.js
+                // Load and initialize webgazer
                 const webgazerScript = document.createElement('script');
                 webgazerScript.src = chrome.runtime.getURL('webgazer.js');
-                webgazerScript.onload = async () => {
-                    try {
-                        const webgazer = await window.initWebGazer();
-                        console.log('WebGazer initialized successfully');
-                    } catch (err) {
-                        console.error('WebGazer initialization error:', err);
-                    }
-                };
-                document.body.appendChild(webgazerScript);
+                
+                await new Promise((resolve, reject) => {
+                    webgazerScript.onload = async () => {
+                        try {
+                            const webgazer = await window.initWebGazer();
+                            console.log('視線追跡の初期化が完了しました');
+                            resolve();
+                        } catch (err) {
+                            reject(new Error('視線追跡の初期化に失敗しました: ' + err.message));
+                        }
+                    };
+                    webgazerScript.onerror = () => reject(new Error('webgazer.jsの読み込みに失敗しました'));
+                    document.body.appendChild(webgazerScript);
+                });
             } catch (err) {
-                console.error('Error loading face-api models:', err);
+                console.error(err.message);
+                // Display error to user
+                const errorDiv = document.createElement('div');
+                errorDiv.style.color = 'red';
+                errorDiv.style.padding = '20px';
+                errorDiv.textContent = err.message;
+                document.body.appendChild(errorDiv);
             }
         }
 
