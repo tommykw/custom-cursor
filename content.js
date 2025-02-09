@@ -1042,7 +1042,12 @@ async function initializeEyeTracking() {
   try {
     console.log('視線追跡を初期化中...');
 
-    // Check if face-api.js is loaded
+    // Check if face-api.js is loaded and wait for it to be ready
+    let retries = 0;
+    while (typeof faceapi === 'undefined' && retries < 5) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries++;
+    }
     if (typeof faceapi === 'undefined') {
       throw new Error('face-api.jsが読み込まれていません');
     }
@@ -1057,19 +1062,32 @@ async function initializeEyeTracking() {
       ]);
       console.log('顔認識モデルの読み込みが完了しました');
     } catch (modelError) {
+      console.error('モデル読み込みエラー:', modelError);
       throw new Error('顔認識モデルの読み込みに失敗しました: ' + modelError.message);
     }
 
-    // Initialize WebGazer
+    // Initialize WebGazer with retries
+    retries = 0;
+    while ((!window.webgazer || !window.initWebGazer) && retries < 10) {
+      console.log('WebGazerの読み込みを待機中...', retries + 1);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      retries++;
+    }
     if (!window.webgazer || !window.initWebGazer) {
       throw new Error('WebGazerが正しく読み込まれていません');
     }
     
-    webgazer = await window.initWebGazer();
-    if (!webgazer) {
-      throw new Error('WebGazerの初期化に失敗しました');
+    try {
+      console.log('WebGazerを初期化中...');
+      webgazer = await window.initWebGazer();
+      if (!webgazer) {
+        throw new Error('WebGazerの初期化に失敗しました');
+      }
+      console.log('WebGazer初期化成功');
+    } catch (error) {
+      console.error('WebGazer初期化エラー:', error);
+      throw new Error('WebGazerの初期化に失敗しました: ' + error.message);
     }
-    console.log('WebGazer初期化成功');
 
     // Initialize eye tracking
     await webgazer.initialize();
@@ -1125,24 +1143,42 @@ function stopEyeTracking() {
   
   // Cleanup WebGazer resources
   if (webgazer) {
-    webgazer.stopTracking();
-    webgazer = null;
+    try {
+      webgazer.stopTracking();
+      webgazer = null;
+    } catch (error) {
+      console.error('視線追跡の停止中にエラーが発生しました:', error);
+    }
   }
 
   // Cleanup UI elements
-  gazeIndicator.style.display = 'none';
-  realtimeHeatmap.style.display = 'none';
-  eyeTrackButton.innerHTML = '👁 視線追跡開始';
-  eyeTrackButton.style.backgroundColor = '#673AB7';
-  addButtonHoverEffects(eyeTrackButton, '#673AB7');
+  if (gazeIndicator) {
+    gazeIndicator.style.display = 'none';
+  }
+  if (realtimeHeatmap) {
+    realtimeHeatmap.style.display = 'none';
+  }
+  
+  // Update button state
+  if (eyeTrackButton) {
+    eyeTrackButton.innerHTML = '👁 視線追跡開始';
+    eyeTrackButton.style.backgroundColor = '#673AB7';
+    addButtonHoverEffects(eyeTrackButton, '#673AB7');
+  }
 
   // Show analysis if we have data
-  if (eyeTrackingData.length > 0) {
-    showAnalysis();
+  if (eyeTrackingData && eyeTrackingData.length > 0) {
+    try {
+      showAnalysis();
+    } catch (error) {
+      console.error('分析データの表示中にエラーが発生しました:', error);
+    }
   }
   
   // Clear tracking data
   eyeTrackingData = [];
+  
+  console.log('視線追跡を停止しました');
 }
 
 // 視線追跡ボタンを作成
