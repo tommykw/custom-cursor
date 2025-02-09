@@ -1042,57 +1042,44 @@ async function initializeEyeTracking() {
   try {
     console.log('視線追跡を初期化中...');
 
-    // カメラへのアクセス許可を要求
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-      video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        facingMode: "user"
-      }
-    });
-    console.log('カメラアクセス成功');
-
-    // WebGazerの初期化
+    if (!window.webgazer || !window.initWebGazer) {
+      throw new Error('WebGazerが正しく読み込まれていません');
+    }
+    
     webgazer = await window.initWebGazer();
     if (!webgazer) {
       throw new Error('WebGazerの初期化に失敗しました');
     }
     console.log('WebGazer初期化成功');
 
-    // WebGazerの設定と開始（キャリブレーションをスキップ）
-    await webgazer
-      .setRegression('ridge')
-      .setTracker('TFFacemesh')
-      .begin();
-    
-    // 直接視線追跡を開始
-    startEyeTracking();
+    await webgazer.begin();
+    webgazer.setGazeListener((data, timestamp) => {
+      if (data && isEyeTracking) {
+        eyeTrackingData.push({
+          x: data.x,
+          y: data.y,
+          timestamp: timestamp,
+          confidence: data.confidence
+        });
+        
+        // 視線インジケーターを更新
+        if (gazeIndicator) {
+          gazeIndicator.style.display = 'block';
+          gazeIndicator.style.left = `${data.x}px`;
+          gazeIndicator.style.top = `${data.y}px`;
+        }
 
-    // 視線データの収集開始
-    document.addEventListener('gazeData', (event) => {
-      if (!isEyeTracking) return;
-      
-      const data = event.detail;
-      console.log('視線データ受信:', data); // デバッグ用
-
-      // 視線インジケーターを更新
-      gazeIndicator.style.display = 'block';
-      gazeIndicator.style.left = `${data.x}px`;
-      gazeIndicator.style.top = `${data.y}px`;
-      
-      // リアルタイムヒートマップを表示
-      realtimeHeatmap.style.display = 'block';
-      updateRealtimeHeatmap(data.x, data.y, data.confidence);
-
-      // 視線データを記録
-      eyeTrackingData.push({
-        x: data.x,
-        y: data.y + window.scrollY,
-        timestamp: data.timestamp,
-        confidence: data.confidence
-      });
+        // リアルタイムヒートマップを更新
+        if (realtimeHeatmap) {
+          realtimeHeatmap.style.display = 'block';
+          updateRealtimeHeatmap(data.x, data.y, data.confidence);
+        }
+      }
     });
 
+    console.log('視線追跡の初期化が完了しました');
+    startEyeTracking();
+    return true;
   } catch (error) {
     console.error('視線追跡の初期化エラー:', error);
     if (error.name === 'NotAllowedError') {
@@ -1100,6 +1087,7 @@ async function initializeEyeTracking() {
     } else {
       alert('視線追跡の初期化に失敗しました: ' + error.message);
     }
+    return false;
   }
 }
 
