@@ -427,14 +427,10 @@ class WebGazer {
       timestamp: Date.now()
     };
   }
-  }
 
   async track() {
     if (!this.isTracking) return;
 
-    // Face-APIの読み込み
-    await this.loadFaceAPI();
-    
     // ビデオフレームの処理
     const processFrame = async () => {
       if (!this.isTracking || !this.videoElement) return;
@@ -451,8 +447,8 @@ class WebGazer {
         const rightEye = landmarks.getRightEye();
 
         // 瞳の中心を計算
-        const leftPupil = this.calculatePupilCenter(leftEye);
-        const rightPupil = this.calculatePupilCenter(rightEye);
+        const leftPupil = this.calculateEyeCenter(leftEye);
+        const rightPupil = this.calculateEyeCenter(rightEye);
 
         // 画面上の視線位置を推定
         const gazeData = this.estimateGazePoint(leftPupil, rightPupil);
@@ -488,4 +484,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready');          
+console.log('webgazer.js loaded and ready');                

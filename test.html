@@ -24,8 +24,19 @@
 </head>
 <body>
     <div id="debug-info"></div>
-    <script src="face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="webgazer.js"></script>
+    <script>
+        // Load face-api.js models from CDN
+        Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights')
+        ]).then(() => {
+            console.log('Face-api models loaded successfully');
+        }).catch(err => {
+            console.error('Error loading face-api models:', err);
+        });
+    </script>
     <script>
         const debugInfo = document.getElementById('debug-info');
         let target = null;
