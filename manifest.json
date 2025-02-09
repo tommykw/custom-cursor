@@ -5,7 +5,8 @@
   "description": "A Chrome extension that enhances cursor visibility during screen sharing",
   "permissions": [
     "activeTab",
-    "tabs"
+    "tabs",
+    "camera"
   ],
   "host_permissions": [
     "<all_urls>"
