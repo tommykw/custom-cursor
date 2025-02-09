@@ -29,8 +29,8 @@
     <script>
         // Load face-api.js models from CDN
         Promise.all([
-            faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-            faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights')
+            faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('/models')
         ]).then(() => {
             console.log('Face-api models loaded successfully');
         }).catch(err => {
