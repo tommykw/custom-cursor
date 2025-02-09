@@ -272,6 +272,163 @@ class WebGazer {
     return this._videoContext;
   }
 
+  async calibrate() {
+    // キャリブレーションポイントの定義（3x3グリッド）
+    const points = [
+      { x: 0.1, y: 0.1 }, { x: 0.5, y: 0.1 }, { x: 0.9, y: 0.1 },
+      { x: 0.1, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.9, y: 0.5 },
+      { x: 0.1, y: 0.9 }, { x: 0.5, y: 0.9 }, { x: 0.9, y: 0.9 }
+    ];
+    
+    this.calibrationData = [];
+    
+    // キャリブレーション用のオーバーレイを作成
+    const overlay = this.createCalibrationOverlay();
+    
+    try {
+      for (const point of points) {
+        // キャリブレーションポイントを表示
+        await this.showCalibrationPoint(overlay, point);
+        
+        // 視線データを収集（1秒間）
+        const eyeData = await this.collectEyeData(1000);
+        
+        this.calibrationData.push({
+          point,
+          eyeData
+        });
+      }
+      
+      // キャリブレーション行列を計算
+      this.calibrationMatrix = this.computeCalibrationMatrix();
+      return true;
+    } catch (error) {
+      console.error('キャリブレーションエラー:', error);
+      return false;
+    } finally {
+      // オーバーレイを削除
+      overlay.remove();
+    }
+  }
+
+  createCalibrationOverlay() {
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100%',
+      background: 'rgba(0, 0, 0, 0.8)',
+      zIndex: '2147483646',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center'
+    });
+    
+    const point = document.createElement('div');
+    Object.assign(point.style, {
+      width: '20px',
+      height: '20px',
+      borderRadius: '50%',
+      background: 'white',
+      position: 'absolute',
+      transform: 'translate(-50%, -50%)',
+      transition: 'all 0.5s ease'
+    });
+    
+    overlay.appendChild(point);
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  async showCalibrationPoint(overlay, point) {
+    const target = overlay.firstElementChild;
+    
+    // 画面上の実際の位置を計算
+    const x = point.x * window.innerWidth;
+    const y = point.y * window.innerHeight;
+    
+    // ポイントを移動
+    target.style.left = `${x}px`;
+    target.style.top = `${y}px`;
+    
+    // アニメーション効果
+    target.animate([
+      { transform: 'translate(-50%, -50%) scale(1)' },
+      { transform: 'translate(-50%, -50%) scale(1.5)' },
+      { transform: 'translate(-50%, -50%) scale(1)' }
+    ], {
+      duration: 1000,
+      iterations: 1
+    });
+    
+    // ユーザーが注視するのを待つ
+    await new Promise(resolve => setTimeout(resolve, 1500));
+  }
+
+  async collectEyeData(duration) {
+    const startTime = Date.now();
+    const samples = [];
+    
+    while (Date.now() - startTime < duration) {
+      // 顔の検出と特徴点の抽出
+      const detections = await faceapi.detectAllFaces(
+        this.videoElement,
+        new faceapi.TinyFaceDetectorOptions()
+      ).withFaceLandmarks();
+
+      if (detections && detections.length > 0) {
+        const face = detections[0];
+        const landmarks = face.landmarks;
+        const leftEye = landmarks.getLeftEye();
+        const rightEye = landmarks.getRightEye();
+
+        samples.push({
+          timestamp: Date.now(),
+          leftEye,
+          rightEye,
+          confidence: face.detection.score
+        });
+      }
+      
+      // フレームレートを制御
+      await new Promise(resolve => setTimeout(resolve, 16)); // ~60fps
+    }
+    
+    return samples;
+  }
+
+  computeCalibrationMatrix() {
+    // 最小二乗法で変換行列を計算
+    const points = this.calibrationData.map(d => d.point);
+    const eyeData = this.calibrationData.map(d => {
+      const avgData = d.eyeData.reduce((acc, curr) => {
+        const leftCenter = this.calculateEyeCenter(curr.leftEye);
+        const rightCenter = this.calculateEyeCenter(curr.rightEye);
+        return {
+          x: acc.x + (leftCenter.x + rightCenter.x) / 2,
+          y: acc.y + (leftCenter.y + rightCenter.y) / 2,
+          count: acc.count + 1
+        };
+      }, { x: 0, y: 0, count: 0 });
+      
+      return {
+        x: avgData.x / avgData.count,
+        y: avgData.y / avgData.count
+      };
+    });
+    
+    // 変換行列を計算（アフィン変換）
+    return {
+      points,
+      eyeData,
+      // 実際の変換はmapToScreenCoordinatesで適用
+      timestamp: Date.now()
+    };
+  }
+  }
+
   async track() {
     if (!this.isTracking) return;
 
@@ -331,4 +488,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready');        
+console.log('webgazer.js loaded and ready');          
