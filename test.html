@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eye Tracking Test</title>
+    <style>
+        .test-target {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: red;
+            transform: translate(-50%, -50%);
+        }
+        #debug-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="debug-info"></div>
+    <script src="face-api.min.js"></script>
+    <script src="webgazer.js"></script>
+    <script>
+        const debugInfo = document.getElementById('debug-info');
+        let target = null;
+        let startTime = null;
+        let frames = 0;
+        let lastGazeDistance = 0;
+
+        // テストターゲットを作成
+        function createTarget(x, y) {
+            if (target) target.remove();
+            target = document.createElement('div');
+            target.className = 'test-target';
+            target.style.left = x + 'px';
+            target.style.top = y + 'px';
+            document.body.appendChild(target);
+            return target;
+        }
+
+        // 視線とターゲットの距離を計算
+        function calculateDistance(gaze, target) {
+            const rect = target.getBoundingClientRect();
+            const targetX = rect.left + rect.width / 2;
+            const targetY = rect.top + rect.height / 2;
+            return Math.sqrt(
+                Math.pow(gaze.x - targetX, 2) + 
+                Math.pow(gaze.y - targetY, 2)
+            );
+        }
+
+        // デバッグ情報を更新
+        function updateDebugInfo(info) {
+            frames++;
+            const now = Date.now();
+            const fps = Math.round(frames / ((now - startTime) / 1000));
+            
+            debugInfo.innerHTML = `
+                <div>FPS: ${fps}</div>
+                <div>Confidence: ${(info.confidence * 100).toFixed(1)}%</div>
+                <div>Distance to target: ${Math.round(lastGazeDistance)}px</div>
+                <div>Gaze X: ${Math.round(info.x)}</div>
+                <div>Gaze Y: ${Math.round(info.y)}</div>
+            `;
+        }
+
+        // テストを開始
+        async function startTest() {
+            try {
+                // WebGazerを初期化
+                const webgazer = await window.initWebGazer();
+                startTime = Date.now();
+
+                // キャリブレーションを実行
+                await webgazer.calibrate();
+
+                // ランダムな位置にターゲットを表示
+                const target = createTarget(
+                    Math.random() * (window.innerWidth - 100) + 50,
+                    Math.random() * (window.innerHeight - 100) + 50
+                );
+
+                // 視線データを監視
+                webgazer.setGazeListener((data, timestamp) => {
+                    if (data && target) {
+                        lastGazeDistance = calculateDistance(data, target);
+                        updateDebugInfo(data);
+                    }
+                });
+
+                // 3秒ごとにターゲット位置を変更
+                setInterval(() => {
+                    createTarget(
+                        Math.random() * (window.innerWidth - 100) + 50,
+                        Math.random() * (window.innerHeight - 100) + 50
+                    );
+                }, 3000);
+
+            } catch (error) {
+                console.error('テストエラー:', error);
+                debugInfo.innerHTML = `<div style="color: red">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // ページ読み込み完了後にテストを開始
+        document.addEventListener('DOMContentLoaded', startTest);
+    </script>
+</body>
+</html>
