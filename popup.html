@@ -33,17 +33,42 @@
         // Initialize face-api.js before webgazer
         async function initializeFaceAPI() {
             try {
+                // Check if face-api.js is loaded
+                if (typeof faceapi === 'undefined') {
+                    throw new Error('face-api.jsが読み込まれていません');
+                }
+
                 const modelPath = chrome.runtime.getURL('models');
                 console.log('顔認識モデルを読み込んでいます...');
                 
-                await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
-                ]);
-                console.log('顔認識モデルの読み込みが完了しました');
-                return true;
+                // Show loading status
+                const statusDiv = document.createElement('div');
+                statusDiv.id = 'loading-status';
+                statusDiv.style.padding = '20px';
+                statusDiv.textContent = '顔認識モデルを読み込んでいます...';
+                document.body.appendChild(statusDiv);
+                
+                try {
+                    await Promise.all([
+                        faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
+                        faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
+                    ]);
+                    console.log('顔認識モデルの読み込みが完了しました');
+                    statusDiv.textContent = '顔認識モデルの読み込みが完了しました';
+                    return true;
+                } catch (modelError) {
+                    throw new Error('顔認識モデルの読み込みに失敗しました: ' + modelError.message);
+                }
             } catch (error) {
                 console.error('顔認識モデルの読み込みに失敗しました:', error);
+                // Update or create error display
+                const statusDiv = document.getElementById('loading-status') || document.createElement('div');
+                statusDiv.style.color = 'red';
+                statusDiv.style.padding = '20px';
+                statusDiv.textContent = error.message;
+                if (!statusDiv.parentNode) {
+                    document.body.appendChild(statusDiv);
+                }
                 return false;
             }
         }
@@ -51,19 +76,33 @@
         // Initialize tracking with proper error handling
         async function initializeTracking() {
             try {
+                const statusDiv = document.getElementById('loading-status') || document.createElement('div');
+                statusDiv.id = 'loading-status';
+                statusDiv.style.padding = '20px';
+                if (!statusDiv.parentNode) {
+                    document.body.appendChild(statusDiv);
+                }
+
                 // Initialize face-api.js first
+                statusDiv.textContent = '顔認識システムを初期化中...';
                 if (!await initializeFaceAPI()) {
                     throw new Error('顔認識モデルの読み込みに失敗しました');
                 }
                 
                 // Load and initialize webgazer
+                statusDiv.textContent = '視線追跡システムを読み込み中...';
                 const webgazerScript = document.createElement('script');
                 webgazerScript.src = chrome.runtime.getURL('webgazer.js');
                 
                 await new Promise((resolve, reject) => {
                     webgazerScript.onload = async () => {
                         try {
+                            if (typeof window.initWebGazer !== 'function') {
+                                throw new Error('WebGazerが正しく読み込まれていません');
+                            }
+                            statusDiv.textContent = '視線追跡システムを初期化中...';
                             const webgazer = await window.initWebGazer();
+                            statusDiv.textContent = '視線追跡の初期化が完了しました';
                             console.log('視線追跡の初期化が完了しました');
                             resolve();
                         } catch (err) {
@@ -75,12 +114,12 @@
                 });
             } catch (err) {
                 console.error(err.message);
-                // Display error to user
-                const errorDiv = document.createElement('div');
-                errorDiv.style.color = 'red';
-                errorDiv.style.padding = '20px';
-                errorDiv.textContent = err.message;
-                document.body.appendChild(errorDiv);
+                // Update status div with error
+                const statusDiv = document.getElementById('loading-status');
+                if (statusDiv) {
+                    statusDiv.style.color = 'red';
+                    statusDiv.textContent = err.message;
+                }
             }
         }
 
