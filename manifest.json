@@ -21,6 +21,8 @@
       "matches": ["<all_urls>"],
       "css": ["styles.css"],
       "js": [
+        "face-api.min.js",
+        "webgazer.js",
         "html2canvas.js",
         "gaze-tracker.js",
         "content.js"

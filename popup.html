@@ -1,84 +1,89 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Eye Tracking Test</title>
+    <title>視線追跡設定</title>
     <style>
         body {
-            width: 800px;
-            height: 600px;
+            width: 400px;
+            height: 300px;
             margin: 0;
             padding: 20px;
             font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+        }
+        #status-container {
+            text-align: center;
+            margin-bottom: 20px;
         }
         #loading-status {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 20px;
+            padding: 15px 25px;
             background: rgba(0, 0, 0, 0.8);
             color: white;
             border-radius: 5px;
-            text-align: center;
             font-size: 14px;
-            z-index: 2147483647;
+            margin-bottom: 15px;
         }
-        #debug-info {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 10px;
+        .error {
+            color: #ff4444 !important;
+        }
+        .success {
+            color: #4CAF50 !important;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
             border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 2147483646;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
         }
     </style>
 </head>
 <body>
-    <div id="loading-status">初期化中...</div>
-    <div id="debug-info"></div>
+    <div id="status-container">
+        <div id="loading-status">初期化中...</div>
+    </div>
 
-    <script src="face-api.min.js"></script>
-    <script src="webgazer.js"></script>
     <script>
-        async function initializeTracking() {
-            const statusDiv = document.getElementById('loading-status');
+        const statusDiv = document.getElementById('loading-status');
 
+        // シンプルなステータス表示機能
+        async function showStatus() {
             try {
-                // Initialize face-api.js first
-                statusDiv.textContent = '顔認識モデルを読み込んでいます...';
+                // ステータスを更新
+                statusDiv.textContent = '視線追跡システムを確認中...';
                 
-                // Load face-api.js models
-                const modelPath = chrome.runtime.getURL('models');
-                await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
-                ]);
-                console.log('顔認識モデルの読み込みが完了しました');
-
-                // Initialize WebGazer
-                statusDiv.textContent = '視線追跡システムを初期化中...';
-                const webgazer = await window.initWebGazer();
+                // 初期化状態を確認
+                const tabs = await chrome.tabs.query({active: true, currentWindow: true});
+                await chrome.tabs.sendMessage(tabs[0].id, {type: 'checkEyeTracking'});
                 
-                // Update status
-                statusDiv.textContent = '視線追跡の初期化が完了しました';
+                // 成功メッセージを表示
+                statusDiv.textContent = '視線追跡の準備ができました';
+                statusDiv.classList.add('success');
+                
                 setTimeout(() => {
                     statusDiv.style.opacity = '0';
                     statusDiv.style.transition = 'opacity 0.5s ease';
                 }, 1500);
-
             } catch (error) {
-                console.error('初期化エラー:', error);
-                statusDiv.style.color = 'red';
-                statusDiv.textContent = error.message;
+                console.error('ステータス確認エラー:', error);
+                statusDiv.textContent = error.message || '視線追跡の初期化に失敗しました';
+                statusDiv.classList.add('error');
             }
         }
 
-        // Wait for page load before initializing
-        window.addEventListener('load', initializeTracking);
+        // ページ読み込み時にステータスを表示
+        window.addEventListener('load', showStatus);
     </script>
 </body>
 </html>

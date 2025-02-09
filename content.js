@@ -1042,6 +1042,25 @@ async function initializeEyeTracking() {
   try {
     console.log('視線追跡を初期化中...');
 
+    // Check if face-api.js is loaded
+    if (typeof faceapi === 'undefined') {
+      throw new Error('face-api.jsが読み込まれていません');
+    }
+
+    // Load face-api.js models first
+    console.log('顔認識モデルを読み込んでいます...');
+    const modelPath = chrome.runtime.getURL('models');
+    try {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
+        faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
+      ]);
+      console.log('顔認識モデルの読み込みが完了しました');
+    } catch (modelError) {
+      throw new Error('顔認識モデルの読み込みに失敗しました: ' + modelError.message);
+    }
+
+    // Initialize WebGazer
     if (!window.webgazer || !window.initWebGazer) {
       throw new Error('WebGazerが正しく読み込まれていません');
     }
@@ -1052,7 +1071,8 @@ async function initializeEyeTracking() {
     }
     console.log('WebGazer初期化成功');
 
-    await webgazer.begin();
+    // Initialize eye tracking
+    await webgazer.initialize();
     webgazer.setGazeListener((data, timestamp) => {
       if (data && isEyeTracking) {
         eyeTrackingData.push({
@@ -1102,12 +1122,27 @@ function startEyeTracking() {
 // 視線追跡の停止
 function stopEyeTracking() {
   isEyeTracking = false;
+  
+  // Cleanup WebGazer resources
+  if (webgazer) {
+    webgazer.stopTracking();
+    webgazer = null;
+  }
+
+  // Cleanup UI elements
   gazeIndicator.style.display = 'none';
-  realtimeHeatmap.style.display = 'none'; // リアルタイムヒートマップを非表示
+  realtimeHeatmap.style.display = 'none';
   eyeTrackButton.innerHTML = '👁 視線追跡開始';
   eyeTrackButton.style.backgroundColor = '#673AB7';
   addButtonHoverEffects(eyeTrackButton, '#673AB7');
-  showAnalysis();
+
+  // Show analysis if we have data
+  if (eyeTrackingData.length > 0) {
+    showAnalysis();
+  }
+  
+  // Clear tracking data
+  eyeTrackingData = [];
 }
 
 // 視線追跡ボタンを作成
@@ -1124,6 +1159,18 @@ eyeTrackButton.style.backgroundColor = '#673AB7';
 addButtonHoverEffects(eyeTrackButton, '#673AB7');
 
 document.body.appendChild(eyeTrackButton);
+
+// メッセージハンドラを追加
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'checkEyeTracking') {
+    if (webgazer) {
+      sendResponse({ status: 'ready' });
+    } else {
+      sendResponse({ status: 'not_initialized' });
+    }
+  }
+  return true;  // 非同期レスポンスのために必要
+});
 
 // 視線追跡ボタンのクリックイベント
 eyeTrackButton.addEventListener('click', async () => {
