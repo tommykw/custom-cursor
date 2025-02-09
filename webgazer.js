@@ -182,31 +182,94 @@ class WebGazer {
     );
   }
 
-  calculatePupilCenter(eyePoints) {
+  calculateEyeCenter(eyePoints) {
     // 目の領域の中心を計算
     const centerX = eyePoints.reduce((sum, p) => sum + p.x, 0) / eyePoints.length;
     const centerY = eyePoints.reduce((sum, p) => sum + p.y, 0) / eyePoints.length;
     
-    return { x: centerX, y: centerY };
+    // 目の大きさを計算
+    const width = Math.max(...eyePoints.map(p => p.x)) - Math.min(...eyePoints.map(p => p.x));
+    const height = Math.max(...eyePoints.map(p => p.y)) - Math.min(...eyePoints.map(p => p.y));
+    
+    return { x: centerX, y: centerY, width, height };
   }
 
-  estimateGazePoint(leftPupil, rightPupil) {
-    // 両目の中心点を計算
-    const centerX = (leftPupil.x + rightPupil.x) / 2;
-    const centerY = (leftPupil.y + rightPupil.y) / 2;
+  detectPupil(video, eyeCenter) {
+    // 目の領域を抽出して瞳の位置を検出
+    const ctx = this.getVideoContext();
+    const { x, y, width, height } = eyeCenter;
     
-    // 画面上の座標に変換
+    // 目の領域を少し広めに取る
+    const margin = Math.max(width, height) * 0.2;
+    const region = {
+      x: Math.max(0, x - width/2 - margin),
+      y: Math.max(0, y - height/2 - margin),
+      width: width + margin * 2,
+      height: height + margin * 2
+    };
+    
+    // 瞳の位置を推定（目の中心から少しずれた位置）
+    const pupilX = x + (width * 0.1); // 目の中心から少し内側
+    const pupilY = y + (height * 0.1); // 目の中心から少し下
+    
+    return { x: pupilX, y: pupilY, region };
+  }
+
+  mapToScreenCoordinates(pupilLeft, pupilRight) {
     // ビデオ座標から画面座標への変換
     const videoRect = this.videoElement.getBoundingClientRect();
     const scaleX = window.innerWidth / videoRect.width;
     const scaleY = window.innerHeight / videoRect.height;
     
-    return {
-      x: centerX * scaleX,
-      y: centerY * scaleY,
-      leftEye: leftPupil,
-      rightEye: rightPupil
+    // 両目の中心点を計算
+    const centerX = (pupilLeft.x + pupilRight.x) / 2;
+    const centerY = (pupilLeft.y + pupilRight.y) / 2;
+    
+    // 視線の方向を考慮した補正
+    const gazeVector = {
+      x: pupilRight.x - pupilLeft.x,
+      y: pupilRight.y - pupilLeft.y
     };
+    
+    // 視線方向に基づいて画面上の位置を補正
+    const screenX = (centerX + gazeVector.x * 0.5) * scaleX;
+    const screenY = (centerY + gazeVector.y * 0.5) * scaleY;
+    
+    return { x: screenX, y: screenY };
+  }
+
+  estimateGazePoint(leftEye, rightEye) {
+    // 両目の中心を計算
+    const leftCenter = this.calculateEyeCenter(leftEye);
+    const rightCenter = this.calculateEyeCenter(rightEye);
+    
+    // 瞳の位置を検出
+    const leftPupil = this.detectPupil(this.videoElement, leftCenter);
+    const rightPupil = this.detectPupil(this.videoElement, rightCenter);
+    
+    // 画面座標に変換
+    const screenCoords = this.mapToScreenCoordinates(leftPupil, rightPupil);
+    
+    return {
+      x: screenCoords.x,
+      y: screenCoords.y,
+      leftEye: leftPupil,
+      rightEye: rightPupil,
+      confidence: Math.min(
+        leftCenter.width / (leftCenter.height || 1),  // アスペクト比が正常か
+        rightCenter.width / (rightCenter.height || 1)
+      )
+    };
+  }
+
+  getVideoContext() {
+    if (!this._videoContext) {
+      const canvas = document.createElement('canvas');
+      canvas.width = this.videoElement.videoWidth;
+      canvas.height = this.videoElement.videoHeight;
+      this._videoContext = canvas.getContext('2d');
+    }
+    return this._videoContext;
   }
 
   async track() {
@@ -268,4 +331,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready');      
+console.log('webgazer.js loaded and ready');        
