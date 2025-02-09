@@ -25,17 +25,25 @@
 <body>
     <div id="debug-info"></div>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    <script src="webgazer.js"></script>
     <script>
-        // Load face-api.js models from CDN
-        Promise.all([
-            faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-            faceapi.nets.faceLandmark68Net.loadFromUri('/models')
-        ]).then(() => {
-            console.log('Face-api models loaded successfully');
-        }).catch(err => {
-            console.error('Error loading face-api models:', err);
-        });
+        // Wait for face-api.js to load before loading webgazer
+        window.onload = async () => {
+            try {
+                // Load face-api.js models
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+                    faceapi.nets.faceLandmark68Net.loadFromUri('/models')
+                ]);
+                console.log('Face-api models loaded successfully');
+                
+                // Now load webgazer.js
+                const script = document.createElement('script');
+                script.src = 'webgazer.js';
+                document.body.appendChild(script);
+            } catch (err) {
+                console.error('Error loading face-api models:', err);
+            }
+        };
     </script>
     <script>
         const debugInfo = document.getElementById('debug-info');
