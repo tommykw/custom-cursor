@@ -476,17 +476,27 @@ class WebGazer {
   }
 }
 
-// グローバルオブジェクトとして公開
-window.webgazer = new WebGazer();
-
 // WebGazerの初期化を行う関数をエクスポート
 window.initWebGazer = async function() {
   try {
-    return window.webgazer;
+    // Check if face-api.js is loaded
+    if (typeof faceapi === 'undefined') {
+      throw new Error('face-api.jsが読み込まれていません');
+    }
+
+    // Create and initialize WebGazer instance
+    const webgazer = new WebGazer();
+    console.log('WebGazerインスタンスを作成しました');
+    
+    // Initialize WebGazer
+    await webgazer.begin();
+    console.log('WebGazerの初期化が完了しました');
+    
+    return webgazer;
   } catch (error) {
     console.error('WebGazer初期化エラー:', error);
     throw error;
   }
 };
 
-console.log('webgazer.js loaded and ready');                    
+console.log('webgazer.js loaded and ready');                      
