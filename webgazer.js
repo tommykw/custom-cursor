@@ -34,32 +34,71 @@ class WebGazer {
 
   async begin() {
     try {
+      console.log('視線追跡の初期化を開始します...');
+      
+      // face-api.jsのモデルを読み込む
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+          faceapi.nets.faceLandmark68Net.loadFromUri('/models')
+        ]);
+        console.log('顔認識モデルの読み込みが完了しました');
+      } catch (modelError) {
+        throw new Error('顔認識モデルの読み込みに失敗しました: ' + modelError.message);
+      }
+      
       // カメラアクセスの前にユーザーに説明
       console.log('視線追跡のためにカメラを使用します');
       
       // カメラアクセスをより安全に要求
-      this.stream = await navigator.mediaDevices.getUserMedia({ 
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user"
-        },
-        audio: false  // 明示的にオーディオを無効化
-      });
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({ 
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: "user"
+          },
+          audio: false  // 明示的にオーディオを無効化
+        });
+      } catch (cameraError) {
+        if (cameraError.name === 'NotAllowedError') {
+          throw new Error('カメラの使用が許可されませんでした。視線追跡には必要です。');
+        } else if (cameraError.name === 'NotFoundError') {
+          throw new Error('カメラが見つかりませんでした。カメラが接続されているか確認してください。');
+        } else if (cameraError.name === 'NotReadableError') {
+          throw new Error('カメラにアクセスできません。他のアプリケーションがカメラを使用している可能性があります。');
+        }
+        throw new Error('カメラの初期化に失敗しました: ' + cameraError.message);
+      }
 
+      // ビデオ要素の初期化と設定
       this.videoElement = document.createElement('video');
       this.videoElement.srcObject = this.stream;
       this.videoElement.style.display = 'none';
+      this.videoElement.style.position = 'fixed';
+      this.videoElement.style.top = '0';
+      this.videoElement.style.left = '0';
+      this.videoElement.style.zIndex = '-1';
       document.body.appendChild(this.videoElement);
-      await this.videoElement.play();
+      
+      try {
+        await this.videoElement.play();
+        console.log('カメラの初期化が完了しました');
+      } catch (playError) {
+        throw new Error('ビデオストリームの開始に失敗しました: ' + playError.message);
+      }
 
-      // 視線追跡のシミュレーションを開始
+      // 視線追跡を開始
       this.startTracking();
       return this;
     } catch (error) {
-      console.error('カメラアクセスエラー:', error);
-      if (error.name === 'NotAllowedError') {
-        throw new Error('カメラの使用が許可されませんでした。視線追跡には必要です。');
+      console.error('視線追跡の初期化エラー:', error);
+      // エラーを上位に伝播させる前にリソースをクリーンアップ
+      if (this.stream) {
+        this.stream.getTracks().forEach(track => track.stop());
+      }
+      if (this.videoElement) {
+        this.videoElement.remove();
       }
       throw error;
     }
@@ -143,44 +182,49 @@ class WebGazer {
     );
   }
 
-  track() {
+  async track() {
     if (!this.isTracking) return;
 
-    // 既存のイベントリスナーを削除
-    if (this.mouseMoveHandler) {
-      document.removeEventListener('mousemove', this.mouseMoveHandler);
-    }
+    // Face-APIの読み込み
+    await this.loadFaceAPI();
+    
+    // ビデオフレームの処理
+    const processFrame = async () => {
+      if (!this.isTracking || !this.videoElement) return;
 
-    // 新しいイベントハンドラを作成
-    this.mouseMoveHandler = (e) => {
-      if (this.isTracking) {
-        // マウス位置に少しランダムな揺らぎを加えて視線っぽく
-        const noise = 20;
-        const gazeData = {
-          x: e.clientX + (Math.random() - 0.5) * noise,
-          y: e.clientY + (Math.random() - 0.5) * noise,
-          confidence: 0.5 + Math.random() * 0.5
-        };
+      // 顔の検出
+      const detections = await faceapi.detectAllFaces(this.videoElement, 
+        new faceapi.TinyFaceDetectorOptions()
+      ).withFaceLandmarks();
+
+      if (detections && detections.length > 0) {
+        const face = detections[0]; // 最も大きな顔を使用
+        const landmarks = face.landmarks;
+        const leftEye = landmarks.getLeftEye();
+        const rightEye = landmarks.getRightEye();
+
+        // 瞳の中心を計算
+        const leftPupil = this.calculatePupilCenter(leftEye);
+        const rightPupil = this.calculatePupilCenter(rightEye);
+
+        // 画面上の視線位置を推定
+        const gazeData = this.estimateGazePoint(leftPupil, rightPupil);
+        
+        // 信頼度の計算（顔の検出スコアを使用）
+        gazeData.confidence = face.detection.score;
 
         this.lastGaze = gazeData;
         this.updateDataDisplay(gazeData);
       }
+
+      // 次のフレームを処理
+      if (this.isTracking) {
+        requestAnimationFrame(processFrame);
+      }
     };
 
-    // 定期的にデータを更新（マウスが動いていなくても）
-    this.updateInterval = setInterval(() => {
-      if (this.lastGaze && this.isTracking) {
-        const gazeData = {
-          x: this.lastGaze.x + (Math.random() - 0.5) * 5,
-          y: this.lastGaze.y + (Math.random() - 0.5) * 5,
-          confidence: 0.5 + Math.random() * 0.5
-        };
-        this.updateDataDisplay(gazeData);
-      }
-    }, 100);
-
-    // イベントリスナーを登録
-    document.addEventListener('mousemove', this.mouseMoveHandler);
+    // フレーム処理開始
+    processFrame();
   }
 }
 
@@ -197,4 +241,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready'); 
+console.log('webgazer.js loaded and ready');    
