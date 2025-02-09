@@ -32,57 +32,47 @@
     <script>
         // Initialize face-api.js before webgazer
         async function initializeFaceAPI() {
+            const statusDiv = document.createElement('div');
+            statusDiv.id = 'loading-status';
+            statusDiv.style.padding = '20px';
+            document.body.appendChild(statusDiv);
+
             try {
                 // Check if face-api.js is loaded
                 if (typeof faceapi === 'undefined') {
                     throw new Error('face-api.jsが読み込まれていません');
                 }
 
-                const modelPath = chrome.runtime.getURL('models');
+                statusDiv.textContent = '顔認識モデルを読み込んでいます...';
                 console.log('顔認識モデルを読み込んでいます...');
                 
-                // Show loading status
-                const statusDiv = document.createElement('div');
-                statusDiv.id = 'loading-status';
-                statusDiv.style.padding = '20px';
-                statusDiv.textContent = '顔認識モデルを読み込んでいます...';
-                document.body.appendChild(statusDiv);
-                
-                try {
-                    await Promise.all([
-                        faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
-                        faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
-                    ]);
-                    console.log('顔認識モデルの読み込みが完了しました');
-                    statusDiv.textContent = '顔認識モデルの読み込みが完了しました';
-                    return true;
-                } catch (modelError) {
-                    throw new Error('顔認識モデルの読み込みに失敗しました: ' + modelError.message);
-                }
+                const modelPath = chrome.runtime.getURL('models');
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
+                ]);
+
+                console.log('顔認識モデルの読み込みが完了しました');
+                statusDiv.textContent = '顔認識モデルの読み込みが完了しました';
+                return true;
             } catch (error) {
                 console.error('顔認識モデルの読み込みに失敗しました:', error);
-                // Update or create error display
-                const statusDiv = document.getElementById('loading-status') || document.createElement('div');
                 statusDiv.style.color = 'red';
-                statusDiv.style.padding = '20px';
                 statusDiv.textContent = error.message;
-                if (!statusDiv.parentNode) {
-                    document.body.appendChild(statusDiv);
-                }
                 return false;
             }
         }
 
         // Initialize tracking with proper error handling
         async function initializeTracking() {
-            try {
-                const statusDiv = document.getElementById('loading-status') || document.createElement('div');
-                statusDiv.id = 'loading-status';
-                statusDiv.style.padding = '20px';
-                if (!statusDiv.parentNode) {
-                    document.body.appendChild(statusDiv);
-                }
+            const statusDiv = document.getElementById('loading-status') || document.createElement('div');
+            statusDiv.id = 'loading-status';
+            statusDiv.style.padding = '20px';
+            if (!statusDiv.parentNode) {
+                document.body.appendChild(statusDiv);
+            }
 
+            try {
                 // Initialize face-api.js first
                 statusDiv.textContent = '顔認識システムを初期化中...';
                 if (!await initializeFaceAPI()) {
@@ -114,17 +104,33 @@
                 });
             } catch (err) {
                 console.error(err.message);
-                // Update status div with error
-                const statusDiv = document.getElementById('loading-status');
-                if (statusDiv) {
-                    statusDiv.style.color = 'red';
-                    statusDiv.textContent = err.message;
-                }
+                statusDiv.style.color = 'red';
+                statusDiv.textContent = err.message;
             }
         }
 
-        // Start initialization when the page loads
-        document.addEventListener('DOMContentLoaded', initializeTracking);
+        // Wait for face-api.js to load before initializing
+        window.addEventListener('load', async () => {
+            try {
+                // Check if face-api.js is loaded
+                if (typeof faceapi === 'undefined') {
+                    throw new Error('face-api.jsが読み込まれていません');
+                }
+
+                // Initialize tracking
+                await initializeTracking();
+            } catch (error) {
+                console.error('初期化エラー:', error);
+                const statusDiv = document.getElementById('loading-status') || document.createElement('div');
+                statusDiv.id = 'loading-status';
+                statusDiv.style.color = 'red';
+                statusDiv.style.padding = '20px';
+                statusDiv.textContent = error.message;
+                if (!statusDiv.parentNode) {
+                    document.body.appendChild(statusDiv);
+                }
+            }
+        });
     </script>
 </body>
 </html>
