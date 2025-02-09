@@ -477,19 +477,23 @@ window.initWebGazer = async function() {
       throw new Error('face-api.jsが読み込まれていません');
     }
 
-    // Create and initialize WebGazer instance
+    // Create WebGazer instance
     const webgazer = new WebGazer();
     console.log('WebGazerインスタンスを作成しました');
     
-    // Initialize WebGazer
-    await webgazer.begin();
-    console.log('WebGazerの初期化が完了しました');
-    
-    return webgazer;
+    try {
+      // Initialize WebGazer
+      await webgazer.begin();
+      console.log('WebGazerの初期化が完了しました');
+      return webgazer;
+    } catch (initError) {
+      console.error('WebGazer初期化エラー:', initError);
+      throw new Error('WebGazerの初期化に失敗しました: ' + initError.message);
+    }
   } catch (error) {
     console.error('WebGazer初期化エラー:', error);
     throw error;
   }
 };
 
-console.log('webgazer.js loaded and ready');                        
+console.log('webgazer.js loaded and ready');                          
