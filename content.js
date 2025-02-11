@@ -1058,7 +1058,8 @@ async function initializeEyeTracking() {
     try {
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
-        faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
+        faceapi.nets.faceLandmark68Net.loadFromUri(modelPath),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelPath) // Add tiny model for better performance
       ]);
       console.log('顔認識モデルの読み込みが完了しました');
     } catch (modelError) {
@@ -1089,10 +1090,22 @@ async function initializeEyeTracking() {
       throw new Error('WebGazerの初期化に失敗しました: ' + error.message);
     }
 
-    // Initialize eye tracking
+    // Initialize eye tracking with improved settings
     await webgazer.initialize();
+    
+    // Store the last valid gaze point for smoothing
+    let lastValidGaze = null;
+    
     webgazer.setGazeListener((data, timestamp) => {
-      if (data && isEyeTracking) {
+      if (data && isEyeTracking && data.confidence > 0.6) { // Add confidence threshold
+        // Apply smoothing if we have a previous valid gaze point
+        if (lastValidGaze) {
+          data.x = lastValidGaze.x * 0.3 + data.x * 0.7;
+          data.y = lastValidGaze.y * 0.3 + data.y * 0.7;
+        }
+        
+        lastValidGaze = { x: data.x, y: data.y };
+        
         eyeTrackingData.push({
           x: data.x,
           y: data.y,
@@ -1100,14 +1113,23 @@ async function initializeEyeTracking() {
           confidence: data.confidence
         });
         
-        // 視線インジケーターを更新
+        // Update cursor position based on gaze
+        if (cursor) {
+          cursor.style.left = `${data.x}px`;
+          cursor.style.top = `${data.y}px`;
+          updateTrail(); // Update cursor trail
+        }
+        
+        // Update gaze indicator with confidence feedback
         if (gazeIndicator) {
           gazeIndicator.style.display = 'block';
           gazeIndicator.style.left = `${data.x}px`;
           gazeIndicator.style.top = `${data.y}px`;
+          gazeIndicator.style.opacity = data.confidence.toString();
+          gazeIndicator.style.transform = `translate(-50%, -50%) scale(${0.8 + data.confidence * 0.4})`; // Visual feedback for confidence
         }
 
-        // リアルタイムヒートマップを更新
+        // Update heatmap if enabled
         if (realtimeHeatmap) {
           realtimeHeatmap.style.display = 'block';
           updateRealtimeHeatmap(data.x, data.y, data.confidence);
@@ -1145,25 +1167,54 @@ function stopEyeTracking() {
   if (webgazer) {
     try {
       webgazer.stopTracking();
+      
+      // Stop all video tracks
+      if (webgazer.stream) {
+        webgazer.stream.getTracks().forEach(track => {
+          track.stop();
+          track.enabled = false;
+        });
+      }
+      
       webgazer = null;
     } catch (error) {
       console.error('視線追跡の停止中にエラーが発生しました:', error);
     }
   }
 
-  // Cleanup UI elements
-  if (gazeIndicator) {
-    gazeIndicator.style.display = 'none';
-  }
-  if (realtimeHeatmap) {
-    realtimeHeatmap.style.display = 'none';
-  }
+  // Cleanup UI elements with fade out
+  ['gazeIndicator', 'realtimeHeatmap'].forEach(element => {
+    const el = window[element];
+    if (el) {
+      el.style.transition = 'opacity 0.3s ease';
+      el.style.opacity = '0';
+      setTimeout(() => {
+        el.style.display = 'none';
+        el.style.opacity = '1';
+      }, 300);
+    }
+  });
   
-  // Update button state
+  // Restore mouse control with smooth transition
+  document.addEventListener('mousemove', (e) => {
+    if (cursor) {
+      cursor.style.transition = 'left 0.3s ease, top 0.3s ease';
+      cursor.style.left = `${e.clientX}px`;
+      cursor.style.top = `${e.clientY}px`;
+      updateTrail();
+    }
+  });
+  
+  // Update button state with animation
   if (eyeTrackButton) {
+    eyeTrackButton.style.transition = 'all 0.3s ease';
     eyeTrackButton.innerHTML = '👁 視線追跡開始';
     eyeTrackButton.style.backgroundColor = '#673AB7';
     addButtonHoverEffects(eyeTrackButton, '#673AB7');
+    
+    // Add visual feedback for state change
+    eyeTrackButton.classList.add('pulse');
+    setTimeout(() => eyeTrackButton.classList.remove('pulse'), 1000);
   }
 
   // Show analysis if we have data
@@ -1172,13 +1223,22 @@ function stopEyeTracking() {
       showAnalysis();
     } catch (error) {
       console.error('分析データの表示中にエラーが発生しました:', error);
+      // Attempt to show simplified analysis on error
+      showSimplifiedAnalysis(eyeTrackingData);
     }
   }
   
-  // Clear tracking data
+  // Clear tracking data with backup
+  const trackingDataBackup = [...eyeTrackingData];
   eyeTrackingData = [];
   
+  // Log cleanup completion
   console.log('視線追跡を停止しました');
+  
+  return {
+    success: true,
+    backupData: trackingDataBackup
+  };
 }
 
 // 視線追跡ボタンを作成
@@ -1324,6 +1384,53 @@ class AnalysisDashboard {
   updateMetrics(data) {
     const { hesitations, ignoredAreas, voiceMarkers } = data;
     // メトリクスの更新処理
+  }
+}
+
+// Simplified analysis function for error recovery
+function showSimplifiedAnalysis(trackingData) {
+  try {
+    // Create a simple analysis panel
+    const panel = document.createElement('div');
+    panel.id = 'simplified-analysis';
+    Object.assign(panel.style, {
+      position: 'fixed',
+      right: '20px',
+      top: '20px',
+      padding: '15px',
+      background: 'rgba(0, 0, 0, 0.8)',
+      color: 'white',
+      borderRadius: '8px',
+      zIndex: '9999',
+      fontSize: '14px',
+      maxWidth: '300px'
+    });
+
+    // Calculate basic metrics
+    const totalPoints = trackingData.length;
+    const avgConfidence = trackingData.reduce((sum, point) => sum + point.confidence, 0) / totalPoints;
+    const duration = (trackingData[totalPoints - 1]?.timestamp || 0) - (trackingData[0]?.timestamp || 0);
+
+    panel.innerHTML = `
+      <h3 style="margin: 0 0 10px 0">基本分析</h3>
+      <div>データポイント: ${totalPoints}</div>
+      <div>平均信頼度: ${(avgConfidence * 100).toFixed(1)}%</div>
+      <div>記録時間: ${(duration / 1000).toFixed(1)}秒</div>
+      <div style="margin-top: 10px; font-size: 12px; opacity: 0.7">
+        * これは簡易分析です。詳細な分析は利用できません。
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      panel.style.transition = 'opacity 0.3s ease';
+      panel.style.opacity = '0';
+      setTimeout(() => panel.remove(), 300);
+    }, 5000);
+  } catch (error) {
+    console.error('簡易分析の表示中にエラーが発生しました:', error);
   }
 }
 

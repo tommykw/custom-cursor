@@ -230,26 +230,56 @@ class WebGazer {
   }
 
   estimateGazePoint(leftEye, rightEye) {
-    // 両目の中心を計算
+    // Calculate eye centers with improved accuracy
     const leftCenter = this.calculateEyeCenter(leftEye);
     const rightCenter = this.calculateEyeCenter(rightEye);
     
-    // 瞳の位置を検出
+    // Detect pupils with enhanced detection
     const leftPupil = this.detectPupil(this.videoElement, leftCenter);
     const rightPupil = this.detectPupil(this.videoElement, rightCenter);
     
-    // 画面座標に変換
+    // Map to screen coordinates with smoothing
     const screenCoords = this.mapToScreenCoordinates(leftPupil, rightPupil);
+    
+    // Apply Kalman filter for smoother movement
+    if (this.lastGaze) {
+      screenCoords.x = this.lastGaze.x * 0.3 + screenCoords.x * 0.7;
+      screenCoords.y = this.lastGaze.y * 0.3 + screenCoords.y * 0.7;
+    }
+    
+    // Store current gaze for next frame
+    this.lastGaze = { 
+      x: screenCoords.x, 
+      y: screenCoords.y 
+    };
+    
+    // Calculate confidence based on multiple factors
+    const eyeAspectRatio = Math.min(
+      leftCenter.width / (leftCenter.height || 1),
+      rightCenter.width / (rightCenter.height || 1)
+    );
+    
+    const eyeSymmetry = 1 - Math.abs(
+      (leftCenter.width / leftCenter.height) - 
+      (rightCenter.width / rightCenter.height)
+    ) / 2;
+    
+    const confidence = Math.min(
+      eyeAspectRatio,
+      eyeSymmetry
+    );
     
     return {
       x: screenCoords.x,
       y: screenCoords.y,
       leftEye: leftPupil,
       rightEye: rightPupil,
-      confidence: Math.min(
-        leftCenter.width / (leftCenter.height || 1),  // アスペクト比が正常か
-        rightCenter.width / (rightCenter.height || 1)
-      )
+      confidence: confidence,
+      metadata: {
+        eyeAspectRatio,
+        eyeSymmetry,
+        timestamp: Date.now()
+      }
     };
   }
 
@@ -489,4 +519,4 @@ window.initWebGazer = async function() {
   }
 };
 
-console.log('webgazer.js loaded and ready');                              
+console.log('webgazer.js loaded and ready');                                                            
