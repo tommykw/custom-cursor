@@ -64,6 +64,7 @@ html, body {
   font-size: 16px;
   z-index: 1000;
   transition: all 0.3s ease;
+  background-color: #4CAF50;  /* Default color */
 }
 
 .control-button:hover {
@@ -72,10 +73,20 @@ html, body {
   box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
-/* Button positions */
-#voice-control-button { right: 20px; }
-#record-button { right: 180px; }
-#eye-track-button { right: 340px; }
+/* Footer controls */
+#footer-controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 1000;
+}
+
+/* Button colors */
+#voice-control-button { background-color: #4CAF50; }
+#record-button { background-color: #2196F3; }
+#eye-track-button { background-color: #673AB7; }
 
 /* Overlay elements */
 #custom-cursor-overlay-container {

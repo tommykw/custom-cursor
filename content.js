@@ -96,22 +96,37 @@ const voiceControlButton = document.createElement('button');
 voiceControlButton.id = 'voice-control-button';
 voiceControlButton.innerHTML = '🎤 音声認識開始';
 voiceControlButton.classList.add('control-button');
-voiceControlButton.style.backgroundColor = '#4CAF50';
 document.body.appendChild(voiceControlButton);
 
 const recordButton = document.createElement('button');
 recordButton.id = 'record-button';
 recordButton.innerHTML = '🔴 記録開始';
 recordButton.classList.add('control-button');
-recordButton.style.backgroundColor = '#2196F3';
 document.body.appendChild(recordButton);
 
 const eyeTrackButton = document.createElement('button');
 eyeTrackButton.id = 'eye-track-button';
 eyeTrackButton.innerHTML = '👁 視線追跡開始';
 eyeTrackButton.classList.add('control-button');
-eyeTrackButton.style.backgroundColor = '#673AB7';
 document.body.appendChild(eyeTrackButton);
+
+// Create container for footer buttons
+const footerContainer = document.createElement('div');
+footerContainer.id = 'footer-controls';
+Object.assign(footerContainer.style, {
+  position: 'fixed',
+  bottom: '20px',
+  right: '20px',
+  zIndex: '1000',
+  display: 'flex',
+  gap: '10px'
+});
+document.body.appendChild(footerContainer);
+
+// Move buttons to footer container
+footerContainer.appendChild(voiceControlButton);
+footerContainer.appendChild(recordButton);
+footerContainer.appendChild(eyeTrackButton);
 
 // ボタンクリックで音声認識の開始/停止を切り替え
 voiceControlButton.addEventListener('click', async () => {
@@ -393,21 +408,7 @@ function updateTrail() {
 // カスタムカーソルのz-indexも更新
 cursor.style.zIndex = '2147483647';
 
-// 録画ボタンを作成
-const recordButton = document.createElement('button');
-recordButton.id = 'record-button';
-recordButton.innerHTML = '🔴 記録開始';
-recordButton.style.position = 'fixed';
-recordButton.style.bottom = '20px';
-recordButton.style.right = '180px'; // 音声認識ボタンの左側に配置
-recordButton.style.zIndex = '2147483647';
 
-// 録画ボタンのスタイル
-Object.assign(recordButton.style, buttonBaseStyles);
-recordButton.style.backgroundColor = '#2196F3';
-addButtonHoverEffects(recordButton, '#2196F3');
-
-document.body.appendChild(recordButton);
 
 // ヒートマップキャンバスを作成（スタイルを修正）
 const heatmapCanvas = document.createElement('canvas');
@@ -1274,20 +1275,7 @@ function stopEyeTracking() {
   }
 }
 
-// 視線追跡ボタンを作成
-const eyeTrackButton = document.createElement('button');
-eyeTrackButton.id = 'eye-track-button';
-eyeTrackButton.innerHTML = '👁 視線追跡開始';
-eyeTrackButton.style.position = 'fixed';
-eyeTrackButton.style.bottom = '20px';
-eyeTrackButton.style.right = '500px'; // 他のボタンの左側に配置
 
-// 視線追跡ボタンのスタイル
-Object.assign(eyeTrackButton.style, buttonBaseStyles);
-eyeTrackButton.style.backgroundColor = '#673AB7';
-addButtonHoverEffects(eyeTrackButton, '#673AB7');
-
-document.body.appendChild(eyeTrackButton);
 
 // メッセージハンドラを追加
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
