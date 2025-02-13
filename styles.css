@@ -1,29 +1,105 @@
-html, body, * {
-  cursor: none !important;
+/* Base styles */
+html, body {
+  cursor: none;
 }
 
+/* Custom cursor */
 #custom-cursor {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  background-color: rgba(255, 0, 0, 0.5);
+  border: 2px solid rgba(255, 0, 0, 0.8);
+  border-radius: 50%;
   pointer-events: none;
-  position: absolute;
-  top: 0;
-  left: 0;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
+  transition: all 0.1s ease;
+}
+
+/* Gaze indicator */
+#gaze-indicator {
+  position: fixed;
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background-color: black;
+  background-color: rgba(0, 0, 255, 0.5);
+  border: 2px solid rgba(0, 0, 255, 0.8);
   transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 4000;
+  transition: all 0.1s ease;
+  display: none;
 }
 
+#gaze-indicator.high-confidence {
+  background-color: rgba(0, 255, 0, 0.5);
+  border-color: rgba(0, 255, 0, 0.8);
+}
+
+/* Coordinate display */
+#gaze-coord-display {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 5px;
+  font-size: 14px;
+  font-family: monospace;
+  z-index: 4000;
+  pointer-events: none;
+}
+
+/* Control buttons */
+.control-button {
+  position: fixed;
+  bottom: 20px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.control-button:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+/* Button positions */
+#voice-control-button { right: 20px; }
+#record-button { right: 180px; }
+#eye-track-button { right: 340px; }
+
+/* Overlay elements */
+#custom-cursor-overlay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3000;
+}
+
+/* Animations */
 @keyframes customFadeOut {
   from { opacity: 1; }
   to { opacity: 0; }
 }
 
-#voice-control-button:hover {
-  opacity: 0.9;
-  transform: scale(1.05);
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 
-#voice-control-button {
-  transition: all 0.3s ease;
+.pulse {
+  animation: pulse 0.5s ease-in-out;
 }

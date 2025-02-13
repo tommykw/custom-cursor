@@ -1,14 +1,29 @@
+// Initialize custom cursor
 const cursor = document.createElement('div');
 cursor.id = 'custom-cursor';
+cursor.classList.add('custom-cursor');
 document.body.appendChild(cursor);
+
+// Initialize cursor trail
+const cursorTrail = [];
+const maxTrailPoints = 20;
+
+// Initialize mouse tracking
+document.addEventListener('mousemove', (e) => {
+  cursor.style.left = `${e.clientX}px`;
+  cursor.style.top = `${e.clientY}px`;
+  
+  // Update trail
+  cursorTrail.push({ x: e.clientX, y: e.clientY });
+  if (cursorTrail.length > maxTrailPoints) {
+    cursorTrail.shift();
+  }
+  updateTrail();
+});
 
 // 音声認識の初期化と制御のための変数
 let recognition = null;
 let isListening = false;
-
-// カーソルの軌跡を表示するための配列
-const cursorTrail = [];
-const maxTrailPoints = 20;
 
 // 方向のキーワードを定義
 const DIRECTION_KEYWORDS = {
@@ -76,15 +91,27 @@ document.addEventListener("click", () => {
   );
 });
 
-// 音声認識の開始/停止を制御するボタンを作成
+// Initialize control buttons
 const voiceControlButton = document.createElement('button');
 voiceControlButton.id = 'voice-control-button';
 voiceControlButton.innerHTML = '🎤 音声認識開始';
-voiceControlButton.style.position = 'fixed';
-voiceControlButton.style.bottom = '20px';
-voiceControlButton.style.right = '20px';
-voiceControlButton.style.zIndex = '999999';
+voiceControlButton.classList.add('control-button');
+voiceControlButton.style.backgroundColor = '#4CAF50';
 document.body.appendChild(voiceControlButton);
+
+const recordButton = document.createElement('button');
+recordButton.id = 'record-button';
+recordButton.innerHTML = '🔴 記録開始';
+recordButton.classList.add('control-button');
+recordButton.style.backgroundColor = '#2196F3';
+document.body.appendChild(recordButton);
+
+const eyeTrackButton = document.createElement('button');
+eyeTrackButton.id = 'eye-track-button';
+eyeTrackButton.innerHTML = '👁 視線追跡開始';
+eyeTrackButton.classList.add('control-button');
+eyeTrackButton.style.backgroundColor = '#673AB7';
+document.body.appendChild(eyeTrackButton);
 
 // ボタンクリックで音声認識の開始/停止を切り替え
 voiceControlButton.addEventListener('click', async () => {
@@ -245,24 +272,22 @@ Object.assign(voiceControlButton.style, buttonBaseStyles);
 voiceControlButton.style.backgroundColor = '#4CAF50';
 addButtonHoverEffects(voiceControlButton, '#4CAF50');
 
-// オーバーレイコンテナを作成する関数
+// Create overlay container
 function createOverlayContainer() {
   const container = document.createElement('div');
   container.id = 'custom-cursor-overlay-container';
   
-  // スタイルを設定
   Object.assign(container.style, {
-    position: 'absolute',
+    position: 'fixed',
     top: '0',
     left: '0',
     width: '100%',
     height: '100%',
     pointerEvents: 'none',
-    zIndex: '2147483647'
+    zIndex: '3000'
   });
   
-  // コンテナを body の直前に挿入
-  document.documentElement.insertBefore(container, document.body);
+  document.body.appendChild(container);
   return container;
 }
 
@@ -1130,55 +1155,123 @@ async function initializeEyeTracking() {
 }
 
 // 視線追跡の開始
-function startEyeTracking() {
-  isEyeTracking = true;
-  eyeTrackButton.innerHTML = '⏹ 視線追跡停止';
-  eyeTrackButton.style.backgroundColor = '#f44336';
-  addButtonHoverEffects(eyeTrackButton, '#f44336');
+async function startEyeTracking() {
+  try {
+    if (!webgazer) {
+      webgazer = await window.initWebGazer();
+      
+      // Create coordinate display
+      const coordDisplay = document.createElement('div');
+      coordDisplay.id = 'gaze-coord-display';
+      Object.assign(coordDisplay.style, {
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        padding: '10px',
+        background: 'rgba(0, 0, 0, 0.8)',
+        color: 'white',
+        borderRadius: '5px',
+        fontSize: '14px',
+        fontFamily: 'monospace',
+        zIndex: '4000'
+      });
+      document.body.appendChild(coordDisplay);
+      
+      // Add gaze listener for real-time coordinates
+      webgazer.setGazeListener((data, timestamp) => {
+        if (!data) return;
+        
+        const coords = {
+          x: Math.round(data.x),
+          y: Math.round(data.y),
+          confidence: data.confidence.toFixed(2)
+        };
+        
+        // Update coordinate display
+        coordDisplay.innerHTML = `
+          視線座標:<br>
+          X: ${coords.x}px<br>
+          Y: ${coords.y}px<br>
+          信頼度: ${coords.confidence}
+        `;
+        
+        // Update gaze indicator
+        gazeIndicator.style.display = 'block';
+        gazeIndicator.style.left = `${data.x}px`;
+        gazeIndicator.style.top = `${data.y}px`;
+        
+        // Update confidence indicator
+        if (data.confidence > 0.8) {
+          gazeIndicator.classList.add('high-confidence');
+        } else {
+          gazeIndicator.classList.remove('high-confidence');
+        }
+        
+        // Store tracking data if confidence is high enough
+        if (data.confidence > 0.6) {
+          eyeTrackingData.push({
+            ...coords,
+            timestamp
+          });
+        }
+      });
+      
+      // Run calibration
+      await webgazer.calibrate();
+    }
+    
+    isEyeTracking = true;
+    eyeTrackButton.innerHTML = '⏹ 視線追跡停止';
+    eyeTrackButton.style.backgroundColor = '#f44336';
+    addButtonHoverEffects(eyeTrackButton, '#f44336');
+  } catch (error) {
+    console.error('視線追跡の開始エラー:', error);
+    alert('視線追跡の開始に失敗しました: ' + error.message);
+  }
 }
 
 // 視線追跡の停止
 function stopEyeTracking() {
-  isEyeTracking = false;
-  
-  // Cleanup WebGazer resources
-  if (webgazer) {
-    try {
-      webgazer.stopTracking();
-      webgazer = null;
-    } catch (error) {
-      console.error('視線追跡の停止中にエラーが発生しました:', error);
-    }
-  }
-
-  // Cleanup UI elements
-  if (gazeIndicator) {
-    gazeIndicator.style.display = 'none';
-  }
-  if (realtimeHeatmap) {
-    realtimeHeatmap.style.display = 'none';
-  }
-  
-  // Update button state
-  if (eyeTrackButton) {
+  try {
+    isEyeTracking = false;
+    
+    // Update button state
     eyeTrackButton.innerHTML = '👁 視線追跡開始';
     eyeTrackButton.style.backgroundColor = '#673AB7';
     addButtonHoverEffects(eyeTrackButton, '#673AB7');
-  }
-
-  // Show analysis if we have data
-  if (eyeTrackingData && eyeTrackingData.length > 0) {
-    try {
-      showAnalysis();
-    } catch (error) {
-      console.error('分析データの表示中にエラーが発生しました:', error);
+    
+    // Hide UI elements
+    gazeIndicator.style.display = 'none';
+    const coordDisplay = document.getElementById('gaze-coord-display');
+    if (coordDisplay) {
+      coordDisplay.remove();
     }
+    
+    // Cleanup WebGazer
+    if (webgazer) {
+      webgazer.stopTracking();
+      if (webgazer.stream) {
+        webgazer.stream.getTracks().forEach(track => {
+          track.stop();
+          track.enabled = false;
+        });
+      }
+      webgazer = null;
+    }
+    
+    // Store tracking data for analysis
+    if (eyeTrackingData && eyeTrackingData.length > 0) {
+      console.log('視線追跡データ:', eyeTrackingData);
+    }
+    
+    // Clear tracking data
+    eyeTrackingData = [];
+    
+    console.log('視線追跡を停止しました');
+  } catch (error) {
+    console.error('視線追跡の停止中にエラーが発生しました:', error);
+    alert('視線追跡の停止中にエラーが発生しました: ' + error.message);
   }
-  
-  // Clear tracking data
-  eyeTrackingData = [];
-  
-  console.log('視線追跡を停止しました');
 }
 
 // 視線追跡ボタンを作成
