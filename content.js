@@ -1,6 +1,21 @@
 const cursor = document.createElement('div');
 cursor.id = 'custom-cursor';
+Object.assign(cursor.style, {
+  position: 'fixed',
+  width: '20px',
+  height: '20px',
+  backgroundColor: 'rgba(255, 0, 0, 0.5)',
+  border: '2px solid rgba(255, 0, 0, 0.8)',
+  borderRadius: '50%',
+  pointerEvents: 'none',
+  transform: 'translate(-50%, -50%)',
+  zIndex: '2147483647',
+  transition: 'left 0.1s ease, top 0.1s ease'
+});
 document.body.appendChild(cursor);
+
+// Hide default cursor
+document.documentElement.style.cursor = 'none';
 
 // 音声認識の初期化と制御のための変数
 let recognition = null;
@@ -49,19 +64,41 @@ Object.assign(gazeIndicator.style, {
 });
 document.body.appendChild(gazeIndicator);
 
-// カーソルの移動処理を更新
-document.addEventListener('mousemove', (e) => {
+// Store original mousemove handler
+const originalMouseMoveHandler = (e) => {
   cursor.style.left = `${e.clientX}px`;
   cursor.style.top = `${e.clientY}px`;
   
-  // 軌跡を追加
-  cursorTrail.push({ x: e.clientX, y: e.clientY });
-  if (cursorTrail.length > maxTrailPoints) {
-    cursorTrail.shift();
+  // Update trail if enabled
+  if (cursorTrail) {
+    cursorTrail.push({ x: e.clientX, y: e.clientY });
+    if (cursorTrail.length > maxTrailPoints) {
+      cursorTrail.shift();
+    }
+    updateTrail();
   }
-  
-  // 軌跡を描画
-  updateTrail();
+};
+
+// Initialize mouse tracking
+document.addEventListener('mousemove', originalMouseMoveHandler);
+
+// Create eye tracking button with proper class
+const eyeTrackButton = document.createElement('button');
+eyeTrackButton.id = 'eye-track-button';
+eyeTrackButton.classList.add('control-button');
+eyeTrackButton.innerHTML = '👁 視線追跡開始';
+eyeTrackButton.style.backgroundColor = '#673AB7';
+document.body.appendChild(eyeTrackButton);
+
+// Add control-button class to all control buttons and remove inline styles
+[voiceControlButton, recordButton, eyeTrackButton].forEach(button => {
+  if (button) {
+    button.classList.add('control-button');
+    // Remove inline styles that are now in CSS
+    ['position', 'bottom', 'padding', 'border', 'borderRadius', 'color', 'cursor', 'fontSize'].forEach(prop => {
+      button.style.removeProperty(prop);
+    });
+  }
 });
 
 // クリックアニメーションを更新
@@ -1095,44 +1132,65 @@ async function initializeEyeTracking() {
     
     // Store the last valid gaze point for smoothing
     let lastValidGaze = null;
+    let consecutiveFailures = 0;
+    const MAX_FAILURES = 10;
     
     webgazer.setGazeListener((data, timestamp) => {
-      if (data && isEyeTracking && data.confidence > 0.6) { // Add confidence threshold
-        // Apply smoothing if we have a previous valid gaze point
-        if (lastValidGaze) {
-          data.x = lastValidGaze.x * 0.3 + data.x * 0.7;
-          data.y = lastValidGaze.y * 0.3 + data.y * 0.7;
-        }
+      if (data && isEyeTracking) {
+        // Calculate confidence based on multiple factors
+        const confidence = data.confidence * (1 - Math.min(consecutiveFailures / MAX_FAILURES, 0.5));
         
-        lastValidGaze = { x: data.x, y: data.y };
-        
-        eyeTrackingData.push({
-          x: data.x,
-          y: data.y,
-          timestamp: timestamp,
-          confidence: data.confidence
-        });
-        
-        // Update cursor position based on gaze
-        if (cursor) {
-          cursor.style.left = `${data.x}px`;
-          cursor.style.top = `${data.y}px`;
-          updateTrail(); // Update cursor trail
-        }
-        
-        // Update gaze indicator with confidence feedback
-        if (gazeIndicator) {
-          gazeIndicator.style.display = 'block';
-          gazeIndicator.style.left = `${data.x}px`;
-          gazeIndicator.style.top = `${data.y}px`;
-          gazeIndicator.style.opacity = data.confidence.toString();
-          gazeIndicator.style.transform = `translate(-50%, -50%) scale(${0.8 + data.confidence * 0.4})`; // Visual feedback for confidence
-        }
+        if (confidence > 0.6) {
+          consecutiveFailures = 0;
+          
+          // Apply smoothing if we have a previous valid gaze point
+          if (lastValidGaze) {
+            data.x = lastValidGaze.x * 0.3 + data.x * 0.7;
+            data.y = lastValidGaze.y * 0.3 + data.y * 0.7;
+          }
+          
+          lastValidGaze = { x: data.x, y: data.y };
+          
+          eyeTrackingData.push({
+            x: data.x,
+            y: data.y,
+            timestamp: timestamp,
+            confidence: confidence,
+            metadata: data.metadata || {}
+          });
+          
+          // Update cursor position with smooth transition
+          if (cursor) {
+            cursor.style.transition = 'left 0.1s ease, top 0.1s ease';
+            cursor.style.left = `${data.x}px`;
+            cursor.style.top = `${data.y}px`;
+            updateTrail();
+          }
+          
+          // Update gaze indicator with enhanced feedback
+          if (gazeIndicator) {
+            gazeIndicator.style.display = 'block';
+            gazeIndicator.style.transition = 'all 0.1s ease';
+            gazeIndicator.style.left = `${data.x}px`;
+            gazeIndicator.style.top = `${data.y}px`;
+            gazeIndicator.style.opacity = confidence.toString();
+            gazeIndicator.style.transform = `translate(-50%, -50%) scale(${0.8 + confidence * 0.4})`;
+            gazeIndicator.style.borderColor = `rgba(0, 0, 255, ${confidence})`;
+          }
 
-        // Update heatmap if enabled
-        if (realtimeHeatmap) {
-          realtimeHeatmap.style.display = 'block';
-          updateRealtimeHeatmap(data.x, data.y, data.confidence);
+          // Update heatmap with confidence-based intensity
+          if (realtimeHeatmap) {
+            realtimeHeatmap.style.display = 'block';
+            updateRealtimeHeatmap(data.x, data.y, confidence);
+          }
+        } else {
+          consecutiveFailures++;
+          if (consecutiveFailures >= MAX_FAILURES) {
+            console.warn('視線追跡の精度が低下しています。カメラの位置や照明を確認してください。');
+            if (gazeIndicator) {
+              gazeIndicator.style.borderColor = 'rgba(255, 0, 0, 0.8)';
+            }
+          }
         }
       }
     });
@@ -1154,14 +1212,41 @@ async function initializeEyeTracking() {
 // 視線追跡の開始
 function startEyeTracking() {
   isEyeTracking = true;
+  
+  // Remove mouse control temporarily
+  document.removeEventListener('mousemove', originalMouseMoveHandler);
+  
+  // Update button state with animation
+  eyeTrackButton.classList.add('pulse');
   eyeTrackButton.innerHTML = '⏹ 視線追跡停止';
   eyeTrackButton.style.backgroundColor = '#f44336';
   addButtonHoverEffects(eyeTrackButton, '#f44336');
+  
+  // Ensure cursor remains visible during transition
+  cursor.style.transition = 'left 0.3s ease, top 0.3s ease';
+  
+  // Remove pulse animation after it completes
+  setTimeout(() => {
+    eyeTrackButton.classList.remove('pulse');
+  }, 500);
+  
+  // Show gaze indicator with fade in
+  if (gazeIndicator) {
+    gazeIndicator.style.transition = 'opacity 0.3s ease';
+    gazeIndicator.style.display = 'block';
+    gazeIndicator.style.opacity = '0';
+    setTimeout(() => {
+      gazeIndicator.style.opacity = '1';
+    }, 10);
+  }
 }
 
 // 視線追跡の停止
 function stopEyeTracking() {
   isEyeTracking = false;
+  
+  // Backup tracking data before cleanup
+  const trackingDataBackup = [...eyeTrackingData];
   
   // Cleanup WebGazer resources
   if (webgazer) {
@@ -1196,14 +1281,8 @@ function stopEyeTracking() {
   });
   
   // Restore mouse control with smooth transition
-  document.addEventListener('mousemove', (e) => {
-    if (cursor) {
-      cursor.style.transition = 'left 0.3s ease, top 0.3s ease';
-      cursor.style.left = `${e.clientX}px`;
-      cursor.style.top = `${e.clientY}px`;
-      updateTrail();
-    }
-  });
+  cursor.style.transition = 'left 0.3s ease, top 0.3s ease';
+  document.addEventListener('mousemove', originalMouseMoveHandler);
   
   // Update button state with animation
   if (eyeTrackButton) {
@@ -1228,8 +1307,7 @@ function stopEyeTracking() {
     }
   }
   
-  // Clear tracking data with backup
-  const trackingDataBackup = [...eyeTrackingData];
+  // Clear tracking data after analysis
   eyeTrackingData = [];
   
   // Log cleanup completion
