@@ -1042,55 +1042,17 @@ async function initializeEyeTracking() {
   try {
     console.log('視線追跡を初期化中...');
 
-    // Check if face-api.js is loaded and wait for it to be ready
-    let retries = 0;
-    while (typeof faceapi === 'undefined' && retries < 5) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      retries++;
-    }
-    if (typeof faceapi === 'undefined') {
-      throw new Error('face-api.jsが読み込まれていません');
-    }
-
-    // Load face-api.js models first
-    console.log('顔認識モデルを読み込んでいます...');
-    const modelPath = chrome.runtime.getURL('models');
-    try {
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
-        faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
-      ]);
-      console.log('顔認識モデルの読み込みが完了しました');
-    } catch (modelError) {
-      console.error('モデル読み込みエラー:', modelError);
-      throw new Error('顔認識モデルの読み込みに失敗しました: ' + modelError.message);
-    }
-
-    // Initialize WebGazer with retries
-    retries = 0;
-    while ((!window.webgazer || !window.initWebGazer) && retries < 10) {
-      console.log('WebGazerの読み込みを待機中...', retries + 1);
-      await new Promise(resolve => setTimeout(resolve, 200));
-      retries++;
-    }
     if (!window.webgazer || !window.initWebGazer) {
       throw new Error('WebGazerが正しく読み込まれていません');
     }
     
-    try {
-      console.log('WebGazerを初期化中...');
-      webgazer = await window.initWebGazer();
-      if (!webgazer) {
-        throw new Error('WebGazerの初期化に失敗しました');
-      }
-      console.log('WebGazer初期化成功');
-    } catch (error) {
-      console.error('WebGazer初期化エラー:', error);
-      throw new Error('WebGazerの初期化に失敗しました: ' + error.message);
+    webgazer = await window.initWebGazer();
+    if (!webgazer) {
+      throw new Error('WebGazerの初期化に失敗しました');
     }
+    console.log('WebGazer初期化成功');
 
-    // Initialize eye tracking
-    await webgazer.initialize();
+    await webgazer.begin();
     webgazer.setGazeListener((data, timestamp) => {
       if (data && isEyeTracking) {
         eyeTrackingData.push({
@@ -1140,45 +1102,12 @@ function startEyeTracking() {
 // 視線追跡の停止
 function stopEyeTracking() {
   isEyeTracking = false;
-  
-  // Cleanup WebGazer resources
-  if (webgazer) {
-    try {
-      webgazer.stopTracking();
-      webgazer = null;
-    } catch (error) {
-      console.error('視線追跡の停止中にエラーが発生しました:', error);
-    }
-  }
-
-  // Cleanup UI elements
-  if (gazeIndicator) {
-    gazeIndicator.style.display = 'none';
-  }
-  if (realtimeHeatmap) {
-    realtimeHeatmap.style.display = 'none';
-  }
-  
-  // Update button state
-  if (eyeTrackButton) {
-    eyeTrackButton.innerHTML = '👁 視線追跡開始';
-    eyeTrackButton.style.backgroundColor = '#673AB7';
-    addButtonHoverEffects(eyeTrackButton, '#673AB7');
-  }
-
-  // Show analysis if we have data
-  if (eyeTrackingData && eyeTrackingData.length > 0) {
-    try {
-      showAnalysis();
-    } catch (error) {
-      console.error('分析データの表示中にエラーが発生しました:', error);
-    }
-  }
-  
-  // Clear tracking data
-  eyeTrackingData = [];
-  
-  console.log('視線追跡を停止しました');
+  gazeIndicator.style.display = 'none';
+  realtimeHeatmap.style.display = 'none'; // リアルタイムヒートマップを非表示
+  eyeTrackButton.innerHTML = '👁 視線追跡開始';
+  eyeTrackButton.style.backgroundColor = '#673AB7';
+  addButtonHoverEffects(eyeTrackButton, '#673AB7');
+  showAnalysis();
 }
 
 // 視線追跡ボタンを作成
@@ -1195,18 +1124,6 @@ eyeTrackButton.style.backgroundColor = '#673AB7';
 addButtonHoverEffects(eyeTrackButton, '#673AB7');
 
 document.body.appendChild(eyeTrackButton);
-
-// メッセージハンドラを追加
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'checkEyeTracking') {
-    if (webgazer) {
-      sendResponse({ status: 'ready' });
-    } else {
-      sendResponse({ status: 'not_initialized' });
-    }
-  }
-  return true;  // 非同期レスポンスのために必要
-});
 
 // 視線追跡ボタンのクリックイベント
 eyeTrackButton.addEventListener('click', async () => {

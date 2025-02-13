@@ -10,34 +10,22 @@
   "host_permissions": [
     "<all_urls>"
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "action": {
-    "default_popup": "popup.html"
-  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "css": ["styles.css"],
       "js": [
-        "face-api.min.js",
-        "webgazer.js",
         "html2canvas.js",
+        "webgazer.js",
         "gaze-tracker.js",
         "content.js"
-      ],
-      "run_at": "document_start"
+      ]
     }
   ],
-  "web_accessible_resources": [{
-    "resources": [
-      "face-api.min.js",
-      "models/*",
-      "webgazer.js",
-      "gaze-tracker.js",
-      "html2canvas.js"
-    ],
-    "matches": ["<all_urls>"]
-  }]
+  "web_accessible_resources": [
+    {
+      "resources": ["gaze-tracker.js", "html2canvas.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
