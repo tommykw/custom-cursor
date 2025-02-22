@@ -82,7 +82,7 @@ voiceControlButton.id = 'voice-control-button';
 voiceControlButton.innerHTML = '🎤 音声認識開始';
 voiceControlButton.style.position = 'fixed';
 voiceControlButton.style.bottom = '20px';
-voiceControlButton.style.right = '20px';
+voiceControlButton.style.right = '200px';
 voiceControlButton.style.zIndex = '999999';
 document.body.appendChild(voiceControlButton);
 
@@ -194,56 +194,42 @@ function initializeSpeechRecognition() {
   }
 }
 
-// ボタンのホバーエフェクトを設定する関数
-function addButtonHoverEffects(button, defaultColor) {
-  button.style.transition = 'all 0.3s ease';
-  
-  // ホバー時のスタイル
-  button.addEventListener('mouseenter', () => {
-    button.style.transform = 'translateY(-2px)';
-    button.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-    // 元の色を少し明るくする
-    button.style.backgroundColor = lightenColor(defaultColor, 20);
-  });
-  
-  // ホバーが外れたときのスタイル
-  button.addEventListener('mouseleave', () => {
-    button.style.transform = 'translateY(0)';
-    button.style.boxShadow = 'none';
-    button.style.backgroundColor = defaultColor;
-  });
-}
-
-// 色を明るくする関数
-function lightenColor(color, percent) {
-  const num = parseInt(color.replace('#', ''), 16),
-    amt = Math.round(2.55 * percent),
-    R = (num >> 16) + amt,
-    G = (num >> 8 & 0x00FF) + amt,
-    B = (num & 0x0000FF) + amt;
-  return '#' + (
-    0x1000000 +
-    (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-    (B < 255 ? B < 1 ? 0 : B : 255)
-  ).toString(16).slice(1);
-}
-
-// 各ボタンの基本スタイルを設定
+// ボタンの共通スタイル（一度だけ定義）
 const buttonBaseStyles = {
   padding: '10px 20px',
   border: 'none',
   borderRadius: '5px',
   color: 'white',
   cursor: 'pointer',
-  fontSize: '16px',
+  fontSize: '14px',
+  fontWeight: 'bold',
+  transition: 'all 0.3s ease',
   zIndex: '2147483647'
 };
 
+// 色を調整するヘルパー関数（一度だけ定義）
+function addButtonHoverEffects(button, baseColor) {
+  button.addEventListener('mouseenter', () => {
+    button.style.backgroundColor = adjustColor(baseColor, -20);
+  });
+  button.addEventListener('mouseleave', () => {
+    button.style.backgroundColor = baseColor;
+  });
+}
+
+function adjustColor(color, amount) {
+  const hex = color.replace('#', '');
+  const num = parseInt(hex, 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
+  const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
 // 音声認識ボタンのスタイル更新
 Object.assign(voiceControlButton.style, buttonBaseStyles);
-voiceControlButton.style.backgroundColor = '#4CAF50';
-addButtonHoverEffects(voiceControlButton, '#4CAF50');
+voiceControlButton.style.backgroundColor = '#FF5722';
+addButtonHoverEffects(voiceControlButton, '#FF5722');
 
 // オーバーレイコンテナを作成する関数
 function createOverlayContainer() {
@@ -368,21 +354,129 @@ function updateTrail() {
 // カスタムカーソルのz-indexも更新
 cursor.style.zIndex = '2147483647';
 
-// 録画ボタンを作成
-const recordButton = document.createElement('button');
-recordButton.id = 'record-button';
-recordButton.innerHTML = '🔴 記録開始';
-recordButton.style.position = 'fixed';
-recordButton.style.bottom = '20px';
-recordButton.style.right = '180px'; // 音声認識ボタンの左側に配置
-recordButton.style.zIndex = '2147483647';
+// 1行目のボタン（視線追跡の制御）
+const eyeTrackButton = document.createElement('button');
+eyeTrackButton.id = 'eye-track-button';
+eyeTrackButton.innerHTML = '👁 視線追跡開始';
+eyeTrackButton.style.position = 'fixed';
+eyeTrackButton.style.bottom = '120px';  // 最上段
+eyeTrackButton.style.right = '20px';
 
-// 録画ボタンのスタイル
-Object.assign(recordButton.style, buttonBaseStyles);
-recordButton.style.backgroundColor = '#2196F3';
-addButtonHoverEffects(recordButton, '#2196F3');
+// 2行目のボタン（録画制御）
+const recordVideoButton = document.createElement('button');
+recordVideoButton.id = 'record-video-button';
+recordVideoButton.innerHTML = '⏺️ 録画開始';
+recordVideoButton.style.position = 'fixed';
+recordVideoButton.style.bottom = '70px';  // 中段
+recordVideoButton.style.right = '20px';
 
-document.body.appendChild(recordButton);
+// 録画保存ボタン
+const saveVideoButton = document.createElement('button');
+saveVideoButton.id = 'save-video-button';
+saveVideoButton.innerHTML = '💾 録画保存';
+saveVideoButton.style.position = 'fixed';
+saveVideoButton.style.bottom = '70px';  // 中段
+saveVideoButton.style.right = '200px';
+
+// 3行目のボタン（解析関連）
+const analyzeButton = document.createElement('button');
+analyzeButton.id = 'analyze-video-button';
+analyzeButton.innerHTML = '🔍 録画解析';
+analyzeButton.style.position = 'fixed';
+analyzeButton.style.bottom = '20px';  // 最下段
+analyzeButton.style.right = '20px';
+
+// 音声認識ボタンの位置を調整
+voiceControlButton.style.bottom = '20px';  // 最下段
+voiceControlButton.style.right = '200px';
+
+// 既存のボタンスタイルを拡張
+const extendedButtonStyles = {
+  ...buttonBaseStyles,  // 既存のスタイルを継承
+  fontWeight: 'bold',
+  transition: 'all 0.3s ease'
+};
+
+// 全てのボタンにスタイルを適用
+[eyeTrackButton, recordVideoButton, saveVideoButton, analyzeButton, voiceControlButton].forEach(button => {
+  Object.assign(button.style, extendedButtonStyles);
+});
+
+// 各ボタンの色を設定
+eyeTrackButton.style.backgroundColor = '#673AB7';    // 紫
+recordVideoButton.style.backgroundColor = '#4CAF50';      // 緑
+saveVideoButton.style.backgroundColor = '#2196F3';        // 青
+analyzeButton.style.backgroundColor = '#9C27B0';     // 濃い紫
+voiceControlButton.style.backgroundColor = '#FF5722'; // オレンジ
+
+// ホバーエフェクトを追加
+addButtonHoverEffects(eyeTrackButton, '#673AB7');
+addButtonHoverEffects(recordVideoButton, '#4CAF50');
+addButtonHoverEffects(saveVideoButton, '#2196F3');
+addButtonHoverEffects(analyzeButton, '#9C27B0');
+addButtonHoverEffects(voiceControlButton, '#FF5722');
+
+// ボタンをページに追加
+document.body.appendChild(eyeTrackButton);
+document.body.appendChild(recordVideoButton);
+document.body.appendChild(saveVideoButton);
+document.body.appendChild(analyzeButton);
+document.body.appendChild(voiceControlButton);
+
+// 視線追跡ボタンのイベントリスナー
+eyeTrackButton.addEventListener('click', async () => {
+  if (!isEyeTracking) {
+    try {
+      webgazer = await initWebGazer();
+      await webgazer.begin();
+      startEyeTracking();
+    } catch (error) {
+      console.error('視線追跡の初期化エラー:', error);
+      alert(error.message);
+    }
+  } else {
+    stopEyeTracking();
+  }
+});
+
+// 録画ボタンのイベントリスナー
+recordVideoButton.addEventListener('click', () => {
+  if (!webgazer) {
+    alert('視線追跡を開始してください');
+    return;
+  }
+  
+  if (!webgazer.isRecording) {
+    webgazer.startRecording();
+    recordVideoButton.innerHTML = '⏹ 録画停止';
+    recordVideoButton.style.backgroundColor = '#f44336';
+    addButtonHoverEffects(recordVideoButton, '#f44336');
+  } else {
+    webgazer.stopRecording();
+    recordVideoButton.innerHTML = '⏺️ 録画開始';
+    recordVideoButton.style.backgroundColor = '#4CAF50';
+    addButtonHoverEffects(recordVideoButton, '#4CAF50');
+  }
+});
+
+// 録画保存ボタンのイベントリスナー
+saveVideoButton.addEventListener('click', () => {
+  if (webgazer && webgazer.isRecording) {
+    webgazer.stopRecording();  // 現在の録画を停止してダウンロード
+    webgazer.startRecording(); // 新しい録画を開始
+  } else {
+    alert('録画が開始されていません');
+  }
+});
+
+// 解析ボタンのイベントリスナー
+analyzeButton.addEventListener('click', () => {
+  if (webgazer) {
+    fileInput.click();
+  } else {
+    alert('WebGazerが初期化されていません');
+  }
+});
 
 // ヒートマップキャンバスを作成（スタイルを修正）
 const heatmapCanvas = document.createElement('canvas');
@@ -808,50 +902,6 @@ document.body.appendChild(saveDataButton);
 // データ保存ボタンのクリックイベント
 saveDataButton.addEventListener('click', saveHeatmapData);
 
-// 記録の開始/停止を切り替える部分を更新
-recordButton.addEventListener('click', () => {
-  if (isRecording) {
-    // 記録を停止
-    isRecording = false;
-    recordButton.innerHTML = '👁 ヒートマップ表示';
-    recordButton.style.backgroundColor = '#2196F3';
-    addButtonHoverEffects(recordButton, '#2196F3');
-    captureButton.style.display = 'none';
-    saveDataButton.style.display = 'block'; // データ保存ボタンを表示
-    
-    // 分析結果を表示
-    showAnalysis();
-  } else if (heatmapData.length > 0) {
-    // ヒートマップの表示/非表示を切り替え
-    if (heatmapCanvas.style.display === 'none') {
-      heatmapCanvas.style.display = 'block';
-      captureButton.style.display = 'block';
-      saveDataButton.style.display = 'block'; // データ保存ボタンを表示
-      drawHeatmap();
-      recordButton.innerHTML = '🔴 記録開始';
-      recordButton.style.backgroundColor = '#4CAF50';
-      addButtonHoverEffects(recordButton, '#4CAF50');
-    } else {
-      heatmapCanvas.style.display = 'none';
-      captureButton.style.display = 'none';
-      saveDataButton.style.display = 'none'; // データ保存ボタンを非表示
-      recordButton.innerHTML = '👁 ヒートマップ表示';
-      recordButton.style.backgroundColor = '#f44336';
-      addButtonHoverEffects(recordButton, '#f44336');
-    }
-  } else {
-    // 新しい記録を開始
-    isRecording = true;
-    recordingStartTime = Date.now();
-    heatmapData = [];
-    recordButton.innerHTML = '⏹ 記録停止';
-    recordButton.style.backgroundColor = '#f44336';
-    addButtonHoverEffects(recordButton, '#f44336');
-    captureButton.style.display = 'none';
-    saveDataButton.style.display = 'none'; // データ保存ボタンを非表示
-  }
-});
-
 // 分析結果を表示（視線追跡データを含む改善版）
 function showAnalysis() {
   // 視線追跡データとマウス追跡データを統合
@@ -1094,9 +1144,9 @@ async function initializeEyeTracking() {
 // 視線追跡の開始
 function startEyeTracking() {
   isEyeTracking = true;
-  eyeTrackButton.innerHTML = '⏹ 視線追跡停止';
-  eyeTrackButton.style.backgroundColor = '#f44336';
-  addButtonHoverEffects(eyeTrackButton, '#f44336');
+  recordVideoButton.innerHTML = '⏹ 記録停止';
+  recordVideoButton.style.backgroundColor = '#f44336';
+  addButtonHoverEffects(recordVideoButton, '#f44336');
 }
 
 // 視線追跡の停止
@@ -1104,160 +1154,78 @@ function stopEyeTracking() {
   isEyeTracking = false;
   gazeIndicator.style.display = 'none';
   realtimeHeatmap.style.display = 'none'; // リアルタイムヒートマップを非表示
-  eyeTrackButton.innerHTML = '👁 視線追跡開始';
-  eyeTrackButton.style.backgroundColor = '#673AB7';
-  addButtonHoverEffects(eyeTrackButton, '#673AB7');
+  recordVideoButton.innerHTML = '👁 記録開始';
+  recordVideoButton.style.backgroundColor = '#2196F3';
+  addButtonHoverEffects(recordVideoButton, '#2196F3');
   showAnalysis();
 }
 
-// 視線追跡ボタンを作成
-const eyeTrackButton = document.createElement('button');
-eyeTrackButton.id = 'eye-track-button';
-eyeTrackButton.innerHTML = '👁 視線追跡開始';
-eyeTrackButton.style.position = 'fixed';
-eyeTrackButton.style.bottom = '20px';
-eyeTrackButton.style.right = '500px'; // 他のボタンの左側に配置
+// ファイル選択用の input 要素
+const fileInput = document.createElement('input');
+fileInput.type = 'file';
+fileInput.accept = 'video/webm';
+fileInput.style.display = 'none';
+document.body.appendChild(fileInput);
 
-// 視線追跡ボタンのスタイル
-Object.assign(eyeTrackButton.style, buttonBaseStyles);
-eyeTrackButton.style.backgroundColor = '#673AB7';
-addButtonHoverEffects(eyeTrackButton, '#673AB7');
+// プログレスバーを作成
+const progressContainer = document.createElement('div');
+progressContainer.style.display = 'none';
+progressContainer.style.position = 'fixed';
+progressContainer.style.bottom = '120px'; // ボタンの上に配置
+progressContainer.style.right = '20px';
+progressContainer.style.width = '300px';
+progressContainer.style.backgroundColor = '#f0f0f0';
+progressContainer.style.padding = '10px';
+progressContainer.style.borderRadius = '5px';
+progressContainer.style.zIndex = '2147483647';
 
-document.body.appendChild(eyeTrackButton);
+const progressBar = document.createElement('div');
+progressBar.style.width = '100%';
+progressBar.style.height = '20px';
+progressBar.style.backgroundColor = '#ddd';
+progressBar.style.borderRadius = '10px';
+progressBar.style.overflow = 'hidden';
 
-// 視線追跡ボタンのクリックイベント
-eyeTrackButton.addEventListener('click', async () => {
-  if (isEyeTracking) {
-    stopEyeTracking();
-  } else {
-    if (!webgazer) {
-      await initializeEyeTracking();
-    } else {
-      startEyeTracking();
+const progressFill = document.createElement('div');
+progressFill.style.width = '0%';
+progressFill.style.height = '100%';
+progressFill.style.backgroundColor = '#4CAF50';
+progressFill.style.transition = 'width 0.3s ease';
+
+const progressText = document.createElement('div');
+progressText.style.textAlign = 'center';
+progressText.style.marginTop = '5px';
+progressText.style.fontSize = '12px';
+progressText.textContent = '解析進捗: 0%';
+
+progressBar.appendChild(progressFill);
+progressContainer.appendChild(progressBar);
+progressContainer.appendChild(progressText);
+document.body.appendChild(progressContainer);
+
+// ファイル選択時の処理を更新
+fileInput.addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    analyzeButton.disabled = true;
+    analyzeButton.innerHTML = '⏳ 解析中...';
+    progressContainer.style.display = 'block';
+    progressFill.style.width = '0%';
+    
+    try {
+      await webgazer.analyzeVideo(file, (progress) => {
+        progressFill.style.width = `${progress}%`;
+        progressText.textContent = `解析進捗: ${Math.round(progress)}%`;
+      });
+      alert('解析が完了しました。データがダウンロードされます。');
+    } catch (error) {
+      console.error('解析エラー:', error);
+      alert('解析中にエラーが発生しました');
+    } finally {
+      analyzeButton.disabled = false;
+      analyzeButton.innerHTML = '🔍 録画解析';
+      fileInput.value = '';
+      progressContainer.style.display = 'none';
     }
   }
 });
-
-class BehaviorAnalyzer {
-  constructor() {
-    this.gazePoints = [];
-    this.voiceMarkers = [];
-    this.hesitationThreshold = 2000; // 2秒以上の停滞を迷いとみなす
-  }
-
-  // 視線の停滞を検出
-  detectHesitation(gazeData) {
-    const recentPoints = this.gazePoints.slice(-10);
-    const isStuck = recentPoints.every(point => 
-      Math.abs(point.x - gazeData.x) < 30 && 
-      Math.abs(point.y - gazeData.y) < 30
-    );
-    
-    if (isStuck) {
-      return {
-        type: 'hesitation',
-        location: { x: gazeData.x, y: gazeData.y },
-        duration: this.calculateDuration(recentPoints)
-      };
-    }
-  }
-
-  // 音声キーワードの検出
-  detectVoiceMarkers(transcript) {
-    const hesitationWords = ['えーと', 'あれ', 'うーん', 'んー'];
-    const matches = hesitationWords.filter(word => transcript.includes(word));
-    if (matches.length > 0) {
-      return {
-        type: 'voice_hesitation',
-        words: matches,
-        timestamp: Date.now()
-      };
-    }
-  }
-
-  // 注目度のヒートマップ生成
-  generateAttentionMap() {
-    const canvas = document.createElement('canvas');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const ctx = canvas.getContext('2d');
-
-    // 視線データの密度を計算
-    this.gazePoints.forEach(point => {
-      const gradient = ctx.createRadialGradient(
-        point.x, point.y, 0, 
-        point.x, point.y, 50
-      );
-      gradient.addColorStop(0, 'rgba(255, 0, 0, 0.1)');
-      gradient.addColorStop(1, 'transparent');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    });
-
-    return canvas;
-  }
-
-  // 行動パターンの分析
-  analyzePattern() {
-    return {
-      ignoredAreas: this.findIgnoredAreas(),
-      highInterestAreas: this.findHighInterestAreas(),
-      hesitationPoints: this.findHesitationPoints(),
-      voiceCorrelations: this.correlateVoiceAndGaze()
-    };
-  }
-}
-
-class AnalysisDashboard {
-  constructor() {
-    this.container = this.createDashboard();
-    this.charts = {};
-  }
-
-  createDashboard() {
-    const dashboard = document.createElement('div');
-    dashboard.id = 'analysis-dashboard';
-    Object.assign(dashboard.style, {
-      position: 'fixed',
-      right: '20px',
-      top: '20px',
-      padding: '15px',
-      background: 'rgba(0, 0, 0, 0.8)',
-      color: 'white',
-      borderRadius: '8px',
-      zIndex: '9999'
-    });
-
-    // リアルタイムメトリクス
-    this.addMetricsSection(dashboard);
-    // 注目エリアマップ
-    this.addAttentionMap(dashboard);
-    // 行動パターングラフ
-    this.addBehaviorGraph(dashboard);
-
-    return dashboard;
-  }
-
-  updateMetrics(data) {
-    const { hesitations, ignoredAreas, voiceMarkers } = data;
-    // メトリクスの更新処理
-  }
-}
-
-class CorrelationAnalyzer {
-  analyzeUserBehavior(gazeData, voiceData, interactionData) {
-    return {
-      // 迷いが多い領域
-      troubleAreas: this.findTroubleAreas(gazeData, voiceData),
-      
-      // 無視されている領域
-      ignoredElements: this.findIgnoredElements(gazeData),
-      
-      // ユーザーフロー上の障害
-      flowObstacles: this.findFlowObstacles(interactionData),
-      
-      // 感情マーカー
-      emotionalMarkers: this.analyzeEmotionalResponse(voiceData)
-    };
-  }
-}

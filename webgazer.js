@@ -10,6 +10,11 @@ class WebGazer {
     this.stream = null;
     this.dataDisplay = this.createDataDisplay();
     this.lastGaze = null;
+    this.mediaRecorder = null;
+    this.recordedChunks = [];
+    this.isRecording = false;
+    this.eyeTrackingData = [];  // 目の追跡データを保存
+    this.isAnalyzing = false;
   }
 
   createDataDisplay() {
@@ -49,11 +54,32 @@ class WebGazer {
 
       this.videoElement = document.createElement('video');
       this.videoElement.srcObject = this.stream;
-      this.videoElement.style.display = 'none';
+      this.videoElement.style.position = 'fixed';
+      this.videoElement.style.top = '10px';
+      this.videoElement.style.right = '10px';
+      this.videoElement.style.width = '160px';
+      this.videoElement.style.height = '120px';
+      this.videoElement.style.zIndex = '2147483646';
       document.body.appendChild(this.videoElement);
       await this.videoElement.play();
 
-      // 視線追跡のシミュレーションを開始
+      // MediaRecorderの初期化
+      this.mediaRecorder = new MediaRecorder(this.stream, {
+        mimeType: 'video/webm'
+      });
+
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.recordedChunks.push(event.data);
+        }
+      };
+
+      this.mediaRecorder.onstop = () => {
+        this.downloadRecording();
+      };
+
+      // 録画を開始
+      this.startRecording();
       this.startTracking();
       return this;
     } catch (error) {
@@ -84,7 +110,40 @@ class WebGazer {
     this.track();
   }
 
+  startRecording() {
+    this.recordedChunks = [];
+    this.isRecording = true;
+    this.mediaRecorder.start();
+    console.log('録画開始');
+  }
+
+  stopRecording() {
+    if (this.isRecording) {
+      this.isRecording = false;
+      this.mediaRecorder.stop();
+      console.log('録画停止');
+    }
+  }
+
+  downloadRecording() {
+    const blob = new Blob(this.recordedChunks, {
+      type: 'video/webm'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `eye-tracking-${new Date().toISOString()}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
+  }
+
   stopTracking() {
+    this.stopRecording();
     this.isTracking = false;
     this.dataDisplay.style.display = 'none';
     
@@ -181,6 +240,230 @@ class WebGazer {
 
     // イベントリスナーを登録
     document.addEventListener('mousemove', this.mouseMoveHandler);
+  }
+
+  async analyzeVideo(videoBlob, progressCallback) {
+    this.isAnalyzing = true;
+    this.eyeTrackingData = [];
+    
+    try {
+      console.log('動画解析開始');
+      const videoURL = URL.createObjectURL(videoBlob);
+      const analysisVideo = document.createElement('video');
+      
+      // 動画の読み込みを確実に待つ
+      await new Promise((resolve, reject) => {
+        analysisVideo.onloadeddata = resolve;
+        analysisVideo.onerror = reject;
+        analysisVideo.src = videoURL;
+      });
+
+      console.log('動画読み込み完了');
+      console.log(`動画の長さ: ${analysisVideo.duration}秒`);
+      
+      // キャンバスの準備
+      const canvas = document.createElement('canvas');
+      canvas.width = analysisVideo.videoWidth;
+      canvas.height = analysisVideo.videoHeight;
+      const ctx = canvas.getContext('2d');
+      
+      // フレーム間隔の設定
+      const frameInterval = 1000 / 30; // 30fps
+      const totalFrames = Math.floor(analysisVideo.duration * 30); // 総フレーム数
+      let processedFrames = 0;
+
+      // フレームごとの処理
+      for (let frameIndex = 0; frameIndex < totalFrames && this.isAnalyzing; frameIndex++) {
+        const currentTime = frameIndex / 30;
+        
+        // 現在の時間に設定
+        analysisVideo.currentTime = currentTime;
+        
+        // フレームの描画完了を待つ
+        await new Promise(resolve => {
+          analysisVideo.onseeked = () => {
+            // フレームをキャンバスに描画
+            ctx.drawImage(analysisVideo, 0, 0);
+            resolve();
+          };
+        });
+
+        // 目の位置を検出
+        const eyePosition = await this.detectEyePosition(canvas);
+        if (eyePosition) {
+          this.eyeTrackingData.push({
+            timestamp: currentTime * 1000,
+            ...eyePosition
+          });
+        }
+
+        // 進捗を更新
+        processedFrames++;
+        const progress = (processedFrames / totalFrames) * 100;
+        console.log(`解析進捗: ${Math.round(progress)}%`);
+        if (progressCallback) {
+          progressCallback(progress);
+        }
+
+        // 少し待機して CPU 負荷を軽減
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+
+      console.log('動画解析完了');
+      
+      // クリーンアップ
+      URL.revokeObjectURL(videoURL);
+      analysisVideo.remove();
+      
+      // 解析データをダウンロード
+      this.downloadTrackingData();
+      
+    } catch (error) {
+      console.error('動画解析エラー:', error);
+      throw error;
+    } finally {
+      this.isAnalyzing = false;
+    }
+  }
+
+  async detectEyePosition(canvas) {
+    try {
+      // Canvas から画像データを取得
+      const imageData = canvas.getContext('2d').getImageData(
+        0, 0, canvas.width, canvas.height
+      ).data;
+      
+      // 目の領域を検出
+      const eyeRegions = this.detectEyeRegions(canvas.width, canvas.height, imageData);
+      
+      // 瞳の位置を検出
+      const leftPupil = this.detectPupil(imageData, eyeRegions.left, canvas.width);
+      const rightPupil = this.detectPupil(imageData, eyeRegions.right, canvas.width);
+      
+      // 画面上の視線位置を計算
+      const screenPosition = this.calculateScreenPosition(leftPupil, rightPupil, canvas.width, canvas.height);
+      
+      return {
+        leftEye: leftPupil,
+        rightEye: rightPupil,
+        screenX: screenPosition.x,
+        screenY: screenPosition.y,
+        confidence: screenPosition.confidence
+      };
+    } catch (error) {
+      console.error('目の位置検出エラー:', error);
+      return null;
+    }
+  }
+
+  downloadTrackingData() {
+    const jsonData = JSON.stringify(this.eyeTrackingData, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `eye-tracking-data-${new Date().toISOString()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  stopAnalysis() {
+    this.isAnalyzing = false;
+  }
+
+  // 目の領域を検出する関数
+  detectEyeRegions(width, height, imageData) {
+    // 顔の上部1/3を目の探索領域とする
+    const eyeRegionHeight = Math.floor(height / 3);
+    
+    return {
+      left: {
+        x: 0,
+        y: 0,
+        width: Math.floor(width / 2),
+        height: eyeRegionHeight,
+        data: imageData
+      },
+      right: {
+        x: Math.floor(width / 2),
+        y: 0,
+        width: Math.floor(width / 2),
+        height: eyeRegionHeight,
+        data: imageData
+      }
+    };
+  }
+
+  // 瞳の位置を検出する関数
+  detectPupil(imageData, region, frameWidth) {
+    try {
+      let darkestPoint = { x: region.x, y: region.y, value: 255 };
+      
+      // 領域内で最も暗い点を探す（瞳の候補）
+      for (let y = region.y; y < region.y + region.height; y++) {
+        for (let x = region.x; x < region.x + region.width; x++) {
+          const i = (y * frameWidth + x) * 4;
+          const brightness = (
+            imageData[i] +     // R
+            imageData[i + 1] + // G
+            imageData[i + 2]   // B
+          ) / 3;
+          
+          if (brightness < darkestPoint.value) {
+            darkestPoint = { x, y, value: brightness };
+          }
+        }
+      }
+      
+      return darkestPoint;
+    } catch (error) {
+      console.error('瞳検出エラー:', error);
+      return null;
+    }
+  }
+
+  // 画面上の視線位置を計算する関数
+  calculateScreenPosition(leftPupil, rightPupil, frameWidth, frameHeight) {
+    if (!leftPupil || !rightPupil) {
+      return {
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+        confidence: 0.1
+      };
+    }
+
+    // 両目の中心点を計算
+    const centerX = (leftPupil.x + rightPupil.x) / 2;
+    const centerY = (leftPupil.y + rightPupil.y) / 2;
+    
+    // フレームの中心からの相対位置を計算
+    const relativeX = (centerX - frameWidth / 2) / (frameWidth / 2);
+    const relativeY = (centerY - frameHeight / 2) / (frameHeight / 2);
+    
+    // 画面上の位置に変換
+    const screenX = window.innerWidth * (0.5 + relativeX * 0.5);
+    const screenY = window.innerHeight * (0.5 - relativeY * 0.5); // Y軸は反転
+    
+    // 信頼度を計算（両目の距離などから）
+    const eyeDistance = Math.sqrt(
+      Math.pow(rightPupil.x - leftPupil.x, 2) +
+      Math.pow(rightPupil.y - leftPupil.y, 2)
+    );
+    const confidence = Math.min(
+      1.0,
+      eyeDistance / (frameWidth * 0.2) // 目の距離が画面幅の20%程度を想定
+    );
+
+    return {
+      x: Math.max(0, Math.min(screenX, window.innerWidth)),
+      y: Math.max(0, Math.min(screenY, window.innerHeight)),
+      confidence: confidence
+    };
   }
 }
 
