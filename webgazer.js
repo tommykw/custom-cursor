@@ -470,22 +470,18 @@ class WebGazer {
   }
 
   async initAWSConfig() {
-    return new Promise((resolve, reject) => {
-      chrome.storage.sync.get('awsSettings', (data) => {
-        if (data.awsSettings) {
-          this.awsConfig = {
-            region: data.awsSettings.region,
-            credentials: {
-              accessKeyId: data.awsSettings.accessKeyId,
-              secretAccessKey: data.awsSettings.secretAccessKey
-            }
-          };
-          resolve();
-        } else {
-          reject(new Error('AWS設定が見つかりません。拡張機能の設定から AWS 認証情報を設定してください。'));
-        }
-      });
-    });
+    const credentials = window.AwsCredentialsManager.getInstance().getCredentials();
+    if (!credentials) {
+      throw new Error('AWS設定が見つかりません。拡張機能の設定から AWS 認証情報を設定してください。');
+    }
+    
+    this.awsConfig = {
+      region: credentials.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey
+      }
+    };
   }
 
   async analyzeVideoWithRekognition(videoBlob, progressCallback) {
