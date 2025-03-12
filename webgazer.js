@@ -15,6 +15,9 @@ class WebGazer {
     this.isRecording = false;
     this.eyeTrackingData = [];  // 目の追跡データを保存
     this.isAnalyzing = false;
+    
+    // AWS認証情報の設定を環境変数から取得
+    this.awsConfig = null;
   }
 
   createDataDisplay() {
@@ -464,6 +467,170 @@ class WebGazer {
       y: Math.max(0, Math.min(screenY, window.innerHeight)),
       confidence: confidence
     };
+  }
+
+  async initAWSConfig() {
+    return new Promise((resolve, reject) => {
+      chrome.storage.sync.get('awsSettings', (data) => {
+        if (data.awsSettings) {
+          this.awsConfig = {
+            region: data.awsSettings.region,
+            credentials: {
+              accessKeyId: data.awsSettings.accessKeyId,
+              secretAccessKey: data.awsSettings.secretAccessKey
+            }
+          };
+          resolve();
+        } else {
+          reject(new Error('AWS設定が見つかりません。拡張機能の設定から AWS 認証情報を設定してください。'));
+        }
+      });
+    });
+  }
+
+  async analyzeVideoWithRekognition(videoBlob, progressCallback) {
+    try {
+      await this.initAWSConfig();
+      
+      console.log('Rekognitionによる動画解析開始');
+      
+      // 動画をフレームに分割（最初の3秒間のみ）
+      const maxDuration = 3; // 解析する秒数
+      const fps = 5; // 1秒あたりのフレーム数を減らす
+      const frames = await this.extractFramesFromVideo(videoBlob, maxDuration, fps);
+      const totalFrames = frames.length;
+      
+      console.log(`解析フレーム数: ${totalFrames} (${maxDuration}秒間, ${fps}fps)`);
+      let processedFrames = 0;
+      
+      const analysisResults = [];
+      for (const frame of frames) {
+        const base64Frame = await this.canvasToBase64(frame);
+        const faceAnalysis = await this.analyzeFaceWithRekognition(base64Frame);
+        
+        if (faceAnalysis.FaceDetails && faceAnalysis.FaceDetails.length > 0) {
+          const face = faceAnalysis.FaceDetails[0];
+          analysisResults.push({
+            timestamp: (processedFrames / fps) * 1000,
+            eyeDirection: face.EyeDirection,
+            confidence: face.Confidence,
+            pose: face.Pose
+          });
+        }
+        
+        processedFrames++;
+        const progress = (processedFrames / totalFrames) * 100;
+        if (progressCallback) {
+          progressCallback(progress);
+        }
+      }
+      
+      this.saveAnalysisResults(analysisResults);
+      
+    } catch (error) {
+      console.error('Rekognition解析エラー:', error);
+      throw error;
+    }
+  }
+
+  async analyzeFaceWithRekognition(base64Image) {
+    try {
+      // 1. AWS設定のチェック
+      if (!this.awsConfig) {
+        throw new Error('AWS設定が初期化されていません');
+      }
+      console.log('AWS Config:', {
+        region: this.awsConfig.region,
+        hasAccessKey: !!this.awsConfig.credentials.accessKeyId,
+        hasSecretKey: !!this.awsConfig.credentials.secretAccessKey
+      });
+
+      // 2. 入力画像データのチェック
+      if (!base64Image || !base64Image.startsWith('data:image')) {
+        throw new Error('無効な画像データです');
+      }
+
+      // 3. Base64デコードとバイナリデータの準備
+      const base64Data = base64Image.split(',')[1];
+      const binaryData = atob(base64Data);
+      const byteArray = new Uint8Array(binaryData.length);
+      for (let i = 0; i < binaryData.length; i++) {
+        byteArray[i] = binaryData.charCodeAt(i);
+      }
+
+      // 4. バックグラウンドスクリプトに解析を依頼
+      const response = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          type: 'ANALYZE_FACE',
+          region: this.awsConfig.region,
+          accessKeyId: this.awsConfig.credentials.accessKeyId,
+          secretAccessKey: this.awsConfig.credentials.secretAccessKey,
+          imageData: Array.from(byteArray) // 配列として送信
+        }, response => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (response && response.success) {
+            resolve(response.data);
+          } else {
+            reject(new Error(response ? response.error : 'Unknown error'));
+          }
+        });
+      });
+
+      console.log('Rekognition response:', response);
+      return response;
+
+    } catch (error) {
+      console.error('Rekognition API error:', error);
+      throw error;
+    }
+  }
+
+  async extractFramesFromVideo(videoBlob, maxDuration = 3, fps = 5) {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    await new Promise((resolve) => {
+      video.onloadeddata = resolve;
+      video.src = URL.createObjectURL(videoBlob);
+    });
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const frames = [];
+    const frameInterval = 1000 / fps; // フレーム間隔（ミリ秒）
+    const maxTime = maxDuration * 1000; // 最大時間（ミリ秒）
+    
+    for (let time = 0; time < Math.min(video.duration * 1000, maxTime); time += frameInterval) {
+      video.currentTime = time / 1000;
+      await new Promise(resolve => video.onseeked = resolve);
+      
+      ctx.drawImage(video, 0, 0);
+      frames.push(canvas.toDataURL('image/jpeg', 0.7));
+    }
+    
+    return frames;
+  }
+
+  canvasToBase64(dataUrl) {
+    return dataUrl;
+  }
+
+  saveAnalysisResults(results) {
+    const jsonData = JSON.stringify(results, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `eye-tracking-rekognition-${new Date().toISOString()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }
 

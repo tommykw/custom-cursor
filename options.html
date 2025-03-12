@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Eye Tracking Settings</title>
+  <style>
+    body { 
+      padding: 20px; 
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .form-group { 
+      margin-bottom: 15px; 
+    }
+    label { 
+      display: block; 
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input { 
+      width: 300px; 
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button { 
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .help-text {
+      color: #666;
+      font-size: 0.9em;
+      margin-top: 5px;
+    }
+    .instruction {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="instruction">
+    <h3>AWS認証情報の設定方法</h3>
+    <ol>
+      <li>AWSマネジメントコンソールにログイン</li>
+      <li>IAMサービスを開く</li>
+      <li>ユーザーを作成または選択</li>
+      <li>「セキュリティ認証情報」タブで「アクセスキーの作成」</li>
+      <li>作成されたアクセスキーIDとシークレットアクセスキーを以下に入力</li>
+    </ol>
+    <p>※ Rekognitionの使用権限（AmazonRekognitionFullAccess）が必要です</p>
+  </div>
+
+  <h2>AWS Settings</h2>
+  <div class="form-group">
+    <label for="region">AWS Region:</label>
+    <input type="text" id="region" placeholder="e.g., us-east-1">
+    <div class="help-text">例: ap-northeast-1（東京）, us-east-1（バージニア）</div>
+  </div>
+  <div class="form-group">
+    <label for="accessKeyId">Access Key ID:</label>
+    <input type="text" id="accessKeyId">
+    <div class="help-text">AWSで発行されたアクセスキーID</div>
+  </div>
+  <div class="form-group">
+    <label for="secretAccessKey">Secret Access Key:</label>
+    <input type="password" id="secretAccessKey">
+    <div class="help-text">AWSで発行されたシークレットアクセスキー</div>
+  </div>
+  <button id="save">Save Settings</button>
+  <div id="status" style="margin-top: 15px;"></div>
+
+  <script src="options.js"></script>
+</body>
+</html> 
