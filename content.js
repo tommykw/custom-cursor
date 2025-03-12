@@ -354,7 +354,7 @@ function updateTrail() {
 // カスタムカーソルのz-indexも更新
 cursor.style.zIndex = '2147483647';
 
-// 1行目のボタン（視線追跡の制御）
+// ボタンの作成と配置を修正
 const eyeTrackButton = document.createElement('button');
 eyeTrackButton.id = 'eye-track-button';
 eyeTrackButton.innerHTML = '👁 視線追跡開始';
@@ -362,23 +362,13 @@ eyeTrackButton.style.position = 'fixed';
 eyeTrackButton.style.bottom = '120px';  // 最上段
 eyeTrackButton.style.right = '20px';
 
-// 2行目のボタン（録画制御）
-const recordVideoButton = document.createElement('button');
-recordVideoButton.id = 'record-video-button';
-recordVideoButton.innerHTML = '⏺️ 録画開始';
-recordVideoButton.style.position = 'fixed';
-recordVideoButton.style.bottom = '70px';  // 中段
-recordVideoButton.style.right = '20px';
+const recordButton = document.createElement('button');
+recordButton.id = 'record-button';
+recordButton.innerHTML = '⏺️ 録画開始';
+recordButton.style.position = 'fixed';
+recordButton.style.bottom = '70px';  // 中段
+recordButton.style.right = '20px';
 
-// 録画保存ボタン
-const saveVideoButton = document.createElement('button');
-saveVideoButton.id = 'save-video-button';
-saveVideoButton.innerHTML = '💾 録画保存';
-saveVideoButton.style.position = 'fixed';
-saveVideoButton.style.bottom = '70px';  // 中段
-saveVideoButton.style.right = '200px';
-
-// 3行目のボタン（解析関連）
 const analyzeButton = document.createElement('button');
 analyzeButton.id = 'analyze-video-button';
 analyzeButton.innerHTML = '🔍 録画解析';
@@ -390,38 +380,25 @@ analyzeButton.style.right = '20px';
 voiceControlButton.style.bottom = '20px';  // 最下段
 voiceControlButton.style.right = '200px';
 
-// 既存のボタンスタイルを拡張
-const extendedButtonStyles = {
-  ...buttonBaseStyles,  // 既存のスタイルを継承
-  fontWeight: 'bold',
-  transition: 'all 0.3s ease'
-};
-
-// 全てのボタンにスタイルを適用
-[eyeTrackButton, recordVideoButton, saveVideoButton, analyzeButton, voiceControlButton].forEach(button => {
-  Object.assign(button.style, extendedButtonStyles);
+// ボタンのスタイルを適用
+[eyeTrackButton, recordButton, analyzeButton].forEach(button => {
+  Object.assign(button.style, buttonBaseStyles);
 });
 
-// 各ボタンの色を設定
+// ボタンの色を設定
 eyeTrackButton.style.backgroundColor = '#673AB7';    // 紫
-recordVideoButton.style.backgroundColor = '#4CAF50';      // 緑
-saveVideoButton.style.backgroundColor = '#2196F3';        // 青
+recordButton.style.backgroundColor = '#4CAF50';      // 緑
 analyzeButton.style.backgroundColor = '#9C27B0';     // 濃い紫
-voiceControlButton.style.backgroundColor = '#FF5722'; // オレンジ
 
 // ホバーエフェクトを追加
 addButtonHoverEffects(eyeTrackButton, '#673AB7');
-addButtonHoverEffects(recordVideoButton, '#4CAF50');
-addButtonHoverEffects(saveVideoButton, '#2196F3');
+addButtonHoverEffects(recordButton, '#4CAF50');
 addButtonHoverEffects(analyzeButton, '#9C27B0');
-addButtonHoverEffects(voiceControlButton, '#FF5722');
 
 // ボタンをページに追加
 document.body.appendChild(eyeTrackButton);
-document.body.appendChild(recordVideoButton);
-document.body.appendChild(saveVideoButton);
+document.body.appendChild(recordButton);
 document.body.appendChild(analyzeButton);
-document.body.appendChild(voiceControlButton);
 
 // 視線追跡ボタンのイベントリスナー
 eyeTrackButton.addEventListener('click', async () => {
@@ -440,7 +417,7 @@ eyeTrackButton.addEventListener('click', async () => {
 });
 
 // 録画ボタンのイベントリスナー
-recordVideoButton.addEventListener('click', () => {
+recordButton.addEventListener('click', () => {
   if (!webgazer) {
     alert('視線追跡を開始してください');
     return;
@@ -448,33 +425,43 @@ recordVideoButton.addEventListener('click', () => {
   
   if (!webgazer.isRecording) {
     webgazer.startRecording();
-    recordVideoButton.innerHTML = '⏹ 録画停止';
-    recordVideoButton.style.backgroundColor = '#f44336';
-    addButtonHoverEffects(recordVideoButton, '#f44336');
+    recordButton.innerHTML = '⏹ 録画停止';
+    recordButton.style.backgroundColor = '#f44336';
+    addButtonHoverEffects(recordButton, '#f44336');
   } else {
     webgazer.stopRecording();
-    recordVideoButton.innerHTML = '⏺️ 録画開始';
-    recordVideoButton.style.backgroundColor = '#4CAF50';
-    addButtonHoverEffects(recordVideoButton, '#4CAF50');
+    recordButton.innerHTML = '⏺️ 録画開始';
+    recordButton.style.backgroundColor = '#4CAF50';
+    addButtonHoverEffects(recordButton, '#4CAF50');
   }
 });
 
-// 録画保存ボタンのイベントリスナー
-saveVideoButton.addEventListener('click', () => {
-  if (webgazer && webgazer.isRecording) {
-    webgazer.stopRecording();  // 現在の録画を停止してダウンロード
-    webgazer.startRecording(); // 新しい録画を開始
-  } else {
-    alert('録画が開始されていません');
-  }
-});
+// 解析ボタンのイベントリスナーを修正
+analyzeButton.addEventListener('click', async () => {
+  try {
+    // AWS設定の確認
+    const awsSettings = await new Promise((resolve) => {
+      chrome.storage.sync.get('awsSettings', (data) => resolve(data.awsSettings));
+    });
 
-// 解析ボタンのイベントリスナー
-analyzeButton.addEventListener('click', () => {
-  if (webgazer) {
-    fileInput.click();
-  } else {
-    alert('WebGazerが初期化されていません');
+    if (!awsSettings || !awsSettings.accessKeyId || !awsSettings.secretAccessKey) {
+      alert(`AWS認証情報が設定されていません。
+1. Chromeの拡張機能ページを開く（chrome://extensions/）
+2. 「Custom Cursor for Screen Share」の「詳細」をクリック
+3. 「拡張機能のオプション」をクリック
+4. AWS認証情報を入力して保存してください`);
+      return;
+    }
+
+    // 以降の既存のコード...
+    if (webgazer) {
+      fileInput.click();
+    } else {
+      alert('WebGazerが初期化されていません');
+    }
+  } catch (error) {
+    console.error('解析エラー:', error);
+    alert('解析中にエラーが発生しました: ' + error.message);
   }
 });
 
@@ -654,204 +641,6 @@ function addLegend(ctx) {
   ctx.fillText('視線の動き', padding + 30, padding + 45);
 }
 
-// キャプチャボタンを作成
-const captureButton = document.createElement('button');
-captureButton.id = 'capture-button';
-captureButton.innerHTML = '📸 キャプチャ';
-captureButton.style.position = 'fixed';
-captureButton.style.bottom = '20px';
-captureButton.style.right = '340px'; // 他のボタンの左側に配置
-
-// キャプチャボタンのスタイル
-Object.assign(captureButton.style, buttonBaseStyles);
-captureButton.style.backgroundColor = '#9c27b0';
-addButtonHoverEffects(captureButton, '#9c27b0');
-
-document.body.appendChild(captureButton);
-
-// ヒートマップのキャプチャ機能を改善（全画面キャプチャ対応版）
-async function captureHeatmap() {
-  try {
-    if (typeof html2canvas === 'undefined') {
-      throw new Error('html2canvasライブラリが読み込まれていません');
-    }
-
-    // 現在のスクロール位置を保存
-    const originalScrollPos = {
-      x: window.scrollX,
-      y: window.scrollY
-    };
-
-    // ページ全体のサイズを取得
-    const docWidth = Math.max(
-      document.documentElement.scrollWidth,
-      document.documentElement.clientWidth,
-      document.body.scrollWidth
-    );
-    const docHeight = Math.max(
-      document.documentElement.scrollHeight,
-      document.documentElement.clientHeight,
-      document.body.scrollHeight
-    );
-
-    // キャプチャ中はヒートマップを一時的に非表示
-    const heatmapDisplay = heatmapCanvas.style.display;
-    heatmapCanvas.style.display = 'none';
-
-    try {
-      // ページ全体をキャプチャ
-      const pageImage = await html2canvas(document.documentElement, {
-        width: docWidth,
-        height: docHeight,
-        windowWidth: docWidth,
-        windowHeight: docHeight,
-        x: 0,
-        y: 0,
-        scrollX: 0,
-        scrollY: 0,
-        logging: false,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        scale: 1,
-        onclone: (clonedDoc) => {
-          // クローンされたドキュメントのスタイルを調整
-          const clonedBody = clonedDoc.body;
-          clonedBody.style.width = `${docWidth}px`;
-          clonedBody.style.height = `${docHeight}px`;
-          clonedBody.style.overflow = 'hidden';
-          clonedBody.style.transform = 'none';
-        }
-      });
-
-      // 結果を描画するキャンバスを作成
-      const fullCanvas = document.createElement('canvas');
-      fullCanvas.width = docWidth;
-      fullCanvas.height = docHeight;
-      const ctx = fullCanvas.getContext('2d');
-
-      // ページのスクリーンショットを描画
-      ctx.drawImage(pageImage, 0, 0);
-
-      // ヒートマップデータを描画
-      const heatmapLayer = document.createElement('canvas');
-      heatmapLayer.width = docWidth;
-      heatmapLayer.height = docHeight;
-      const heatmapCtx = heatmapLayer.getContext('2d');
-
-      // マウスの動きを描画（赤系統）
-      heatmapData.forEach(point => {
-        const gradient = heatmapCtx.createRadialGradient(
-          point.x, point.y, 0,
-          point.x, point.y, 30
-        );
-        gradient.addColorStop(0, 'rgba(255, 0, 0, 0.3)');
-        gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
-        heatmapCtx.fillStyle = gradient;
-        heatmapCtx.beginPath();
-        heatmapCtx.arc(point.x, point.y, 30, 0, Math.PI * 2);
-        heatmapCtx.fill();
-      });
-
-      // 視線データを描画（青系統）
-      eyeTrackingData.forEach(point => {
-        const gradient = heatmapCtx.createRadialGradient(
-          point.x, point.y, 0,
-          point.x, point.y, 30
-        );
-        gradient.addColorStop(0, 'rgba(0, 0, 255, 0.3)');
-        gradient.addColorStop(1, 'rgba(0, 0, 255, 0)');
-        heatmapCtx.fillStyle = gradient;
-        heatmapCtx.beginPath();
-        heatmapCtx.arc(point.x, point.y, 30, 0, Math.PI * 2);
-        heatmapCtx.fill();
-      });
-
-      // ヒートマップを合成
-      ctx.globalAlpha = 0.7;
-      ctx.drawImage(heatmapLayer, 0, 0);
-      ctx.globalAlpha = 1.0;
-
-      // 凡例を追加
-      const legendHeight = 80;
-      const padding = 20;
-      
-      // 凡例の背景
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.fillRect(padding, padding, 300, legendHeight);
-
-      // 凡例のテキスト
-      ctx.font = '14px Arial';
-      
-      // マウスの動きの説明
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
-      ctx.beginPath();
-      ctx.arc(padding + 15, padding + 20, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'white';
-      ctx.fillText('マウスの移動', padding + 35, padding + 25);
-
-      // 視線の動きの説明
-      ctx.fillStyle = 'rgba(0, 0, 255, 0.8)';
-      ctx.beginPath();
-      ctx.arc(padding + 15, padding + 45, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'white';
-      ctx.fillText('視線の動き', padding + 35, padding + 50);
-
-      // タイムスタンプを追加
-      const timestamp = new Date().toLocaleString('ja-JP');
-      ctx.fillStyle = 'white';
-      ctx.fillText(`キャプチャ日時: ${timestamp}`, padding + 35, padding + 70);
-
-      // 画像としてダウンロード
-      const link = document.createElement('a');
-      link.download = `heatmap_${Date.now()}.png`;
-      link.href = fullCanvas.toDataURL('image/png');
-      link.click();
-
-      return true;
-    } finally {
-      // ヒートマップの表示状態を元に戻す
-      heatmapCanvas.style.display = heatmapDisplay;
-      // スクロール位置を元に戻す
-      window.scrollTo(originalScrollPos.x, originalScrollPos.y);
-    }
-  } catch (error) {
-    console.error('キャプチャ中にエラーが発生しました:', error);
-    alert('キャプチャに失敗しました: ' + error.message);
-    return false;
-  }
-}
-
-// キャプチャボタンのスタイルを更新（ローディング表示を追加）
-function updateCaptureButtonState(isCapturing = false) {
-  if (isCapturing) {
-    captureButton.innerHTML = '📸 キャプチャ中...';
-    captureButton.style.backgroundColor = '#7B1FA2';
-    captureButton.disabled = true;
-  } else {
-    captureButton.innerHTML = '📸 キャプチャ';
-    captureButton.style.backgroundColor = '#9c27b0';
-    captureButton.disabled = false;
-  }
-}
-
-// キャプチャボタンのクリックイベントを更新
-captureButton.addEventListener('click', async () => {
-  if (captureButton.disabled) return; // 既に処理中の場合は何もしない
-  
-  updateCaptureButtonState(true);
-  try {
-    const success = await captureHeatmap();
-    if (!success) {
-      alert('キャプチャに失敗しました。もう一度お試しください。');
-    }
-  } finally {
-    updateCaptureButtonState(false);
-  }
-});
-
 // ヒートマップデータの保存と読み込み機能を追加
 function saveHeatmapData() {
   const data = {
@@ -883,24 +672,6 @@ function saveHeatmapData() {
   link.click();
   URL.revokeObjectURL(url);
 }
-
-// データ保存ボタンを作成
-const saveDataButton = document.createElement('button');
-saveDataButton.id = 'save-data-button';
-saveDataButton.innerHTML = '💾 データ保存';
-saveDataButton.style.position = 'fixed';
-saveDataButton.style.bottom = '20px';
-saveDataButton.style.right = '660px'; // 他のボタンの左側に配置
-
-// データ保存ボタンのスタイル
-Object.assign(saveDataButton.style, buttonBaseStyles);
-saveDataButton.style.backgroundColor = '#2196F3';
-addButtonHoverEffects(saveDataButton, '#2196F3');
-
-document.body.appendChild(saveDataButton);
-
-// データ保存ボタンのクリックイベント
-saveDataButton.addEventListener('click', saveHeatmapData);
 
 // 分析結果を表示（視線追跡データを含む改善版）
 function showAnalysis() {
@@ -1144,9 +915,9 @@ async function initializeEyeTracking() {
 // 視線追跡の開始
 function startEyeTracking() {
   isEyeTracking = true;
-  recordVideoButton.innerHTML = '⏹ 記録停止';
-  recordVideoButton.style.backgroundColor = '#f44336';
-  addButtonHoverEffects(recordVideoButton, '#f44336');
+  recordButton.innerHTML = '⏹ 記録停止';
+  recordButton.style.backgroundColor = '#f44336';
+  addButtonHoverEffects(recordButton, '#f44336');
 }
 
 // 視線追跡の停止
@@ -1154,9 +925,9 @@ function stopEyeTracking() {
   isEyeTracking = false;
   gazeIndicator.style.display = 'none';
   realtimeHeatmap.style.display = 'none'; // リアルタイムヒートマップを非表示
-  recordVideoButton.innerHTML = '👁 記録開始';
-  recordVideoButton.style.backgroundColor = '#2196F3';
-  addButtonHoverEffects(recordVideoButton, '#2196F3');
+  recordButton.innerHTML = '👁 記録開始';
+  recordButton.style.backgroundColor = '#2196F3';
+  addButtonHoverEffects(recordButton, '#2196F3');
   showAnalysis();
 }
 
@@ -1213,14 +984,15 @@ fileInput.addEventListener('change', async (event) => {
     progressFill.style.width = '0%';
     
     try {
-      await webgazer.analyzeVideo(file, (progress) => {
+      // Rekognitionを使用した解析に変更
+      await webgazer.analyzeVideoWithRekognition(file, (progress) => {
         progressFill.style.width = `${progress}%`;
         progressText.textContent = `解析進捗: ${Math.round(progress)}%`;
       });
       alert('解析が完了しました。データがダウンロードされます。');
     } catch (error) {
       console.error('解析エラー:', error);
-      alert('解析中にエラーが発生しました');
+      alert('解析中にエラーが発生しました: ' + error.message);
     } finally {
       analyzeButton.disabled = false;
       analyzeButton.innerHTML = '🔍 録画解析';

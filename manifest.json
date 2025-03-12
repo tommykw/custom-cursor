@@ -1,19 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Custom Cursor for Screen Share",
+  "name": "Eye Tracking Heatmap",
   "version": "1.0",
-  "description": "A Chrome extension that enhances cursor visibility during screen sharing",
+  "description": "A Chrome extension that tracks eye movements and generates heatmaps",
+  "options_page": "options.html",
   "permissions": [
     "activeTab",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "https://*.amazonaws.com/"
   ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "css": ["styles.css"],
       "js": [
         "html2canvas.js",
         "webgazer.js",
@@ -24,8 +26,15 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["gaze-tracker.js", "html2canvas.js"],
+      "resources": ["aws-sdk.min.js"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'",
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self'"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
 }
